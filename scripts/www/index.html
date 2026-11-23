@@ -1,0 +1,2106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#F6F2EA">
+<title>南京亲子五日游</title>
+<link rel="stylesheet" href="vendor/leaflet.css">
+<style>
+/* =====================================================================
+   南京亲子五日游 · 手机端
+   设计骨架：Swiss Minimalism（密排 + 网格 + 高对比）
+   配色方向：road-trip warm（暖橙 + 地图青）
+   图标：Phosphor 风格内联 SVG（不用 emoji 当 UI 图标）
+   ===================================================================== */
+:root{
+  --paper:#F6F2EA; --card:#FFFDF9;
+  --ink:#2B2622; --ink-2:#5B5249; --muted:#7A726A;
+  --line:#E7DFD2; --line-2:#F0EADD;
+  --maple:#C2452D; --on-maple:#fff; --gold:#D98B2B; --pine:#4E7A5A;
+  /* 5 天站点色 */
+  --d0:#3F7F96; --d1:#5F8F4A; --d2:#C58A1F; --d3:#C2452D; --d4:#6F63A0;
+
+  --r-card:16px; --r-row:10px;
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  --tap:48px; --tab-h:58px;
+  --sh-card:0 2px 8px rgba(60,45,30,.08);
+  --sh-drag:0 12px 32px rgba(60,45,30,.18);
+  --ease:cubic-bezier(.22,.61,.36,1);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden}
+body{
+  background:#e9e3d8;color:var(--ink);
+  font:16px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","HarmonyOS Sans SC","MiSans","Microsoft YaHei",sans-serif;
+  overscroll-behavior:none;
+}
+button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+:focus-visible{outline:2px solid var(--maple);outline-offset:2px;border-radius:6px}
+svg{display:block}
+.ic{width:22px;height:22px;flex:0 0 auto}
+
+/* ---------- 外壳 ---------- */
+#app{
+  position:relative;max-width:480px;margin:0 auto;background:var(--paper);
+  height:100vh;height:100dvh;
+  display:flex;flex-direction:column;overflow:hidden;
+  box-shadow:0 0 40px rgba(60,45,30,.14);
+}
+
+/* ---------- 状态条 ---------- */
+#statusBar{
+  flex:0 0 auto;padding:calc(env(safe-area-inset-top) + 10px) 16px 10px;
+  display:flex;align-items:center;gap:12px;
+  background:linear-gradient(135deg,#43301F,#7A3A24 55%,#A8452A);
+  color:#FFF8F0;
+}
+#statusBar .sb-t{font-size:16px;font-weight:700;letter-spacing:.01em}
+#statusBar .sb-s{font-size:12px;opacity:.82;margin-top:2px}
+#statusBar .sb-right{margin-left:auto;text-align:right;flex:0 0 auto}
+#statusBar .sb-n{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.1}
+#statusBar .sb-l{font-size:11px;opacity:.78}
+#statusBar .sb-bar{height:3px;border-radius:99px;background:rgba(255,255,255,.22);margin-top:6px;overflow:hidden}
+#statusBar .sb-bar>i{display:block;height:100%;width:0;background:#FFC888;border-radius:99px;transition:width .25s}
+#statusBar button{color:inherit}
+
+/* ---------- 舞台 ---------- */
+#stage{flex:1 1 auto;position:relative;overflow:hidden}
+.panel{position:absolute;inset:0;display:none}
+.panel.on{display:block}
+.panel.scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:12px 14px calc(20px + env(safe-area-inset-bottom));}
+
+/* ---------- 卡片舞台 ---------- */
+#p-trip{display:none;flex-direction:column}
+#p-trip.on{display:flex}
+#deckWrap{flex:1 1 auto;position:relative;overflow:hidden;padding:0}
+.card{
+  position:absolute;left:0;right:0;top:0;bottom:0;
+  margin:16px 18px 0;background:var(--card);border:1px solid var(--line);
+  border-radius:var(--r-card);box-shadow:var(--sh-card);
+  display:flex;flex-direction:column;overflow:hidden;
+  transform-origin:50% 88%;will-change:transform,opacity;
+  touch-action:pan-y;
+}
+.card:not(.active){pointer-events:none}
+.card.active{pointer-events:auto}
+.card::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:var(--c)}
+
+.card-head{flex:0 0 auto;padding:14px 16px 10px;border-bottom:1px solid var(--line-2);position:relative}
+.ch-top{display:flex;align-items:flex-start;gap:8px}
+.ch-no{font-size:11px;font-weight:700;letter-spacing:.16em;color:var(--c)}
+.ch-date{font-size:26px;font-weight:700;line-height:1.15;margin-top:2px;letter-spacing:-.01em}
+.ch-date small{font-size:13px;font-weight:500;color:var(--muted);margin-left:6px;letter-spacing:0}
+.ch-theme{font-size:13px;color:var(--ink-2);margin-top:4px}
+.ch-prog{flex:0 0 auto;text-align:right;margin-left:auto}
+.ch-prog b{font-size:20px;font-weight:700;color:var(--c);font-variant-numeric:tabular-nums}
+.ch-prog span{display:block;font-size:11px;color:var(--muted)}
+.rain-btn{
+  display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px;margin-left:auto;
+  border:1px solid var(--line);border-radius:999px;font-size:12.5px;color:var(--muted);background:#FCFAF5;
+}
+.rain-btn[aria-pressed="true"]{background:#EEF3F6;border-color:#B9CDD8;color:#2F5C72;font-weight:600}
+.rain-note{
+  margin-top:10px;display:flex;gap:8px;align-items:flex-start;
+  background:#FDF8EC;border-left:3px solid var(--gold);border-radius:0 8px 8px 0;
+  padding:8px 10px;font-size:12.5px;color:#7A5D1E;
+}
+.rain-note b{color:#6B4E12}
+
+.card-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:6px 10px 14px}
+
+/* 时间轴行 */
+.row{
+  position:relative;display:flex;align-items:flex-start;gap:10px;
+  min-height:var(--tap);padding:9px 6px;border-radius:var(--r-row);
+}
+.row+.row{border-top:1px dashed var(--line-2)}
+.row .hit{position:absolute;inset:0;border-radius:var(--r-row);z-index:1;cursor:pointer}
+.row .hit:active{background:#FAF6EE}
+.row .tick,.row .r-main{position:relative;z-index:0}
+.row-guide{
+  position:relative;z-index:2;flex:0 0 auto;align-self:center;
+  height:34px;padding:0 11px;border-radius:999px;border:1px solid #E4CFC6;
+  background:#FCF7F4;color:var(--maple);font-size:12.5px;font-weight:700;
+  display:inline-flex;align-items:center;gap:4px;white-space:nowrap;
+}
+.row-guide:active{background:#F6E9E4}
+.row-guide .ic{width:15px;height:15px}
+.row .tick{
+  flex:0 0 auto;width:22px;height:22px;margin-top:3px;border:2px solid #D3C9BA;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#fff;transition:background .15s,border-color .15s;
+}
+.row .tick svg{width:14px;height:14px;opacity:0;transition:opacity .15s}
+.row input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.row.done .tick{background:var(--c);border-color:var(--c)}
+.row.done .tick svg{opacity:1}
+.row .r-main{flex:1 1 auto;min-width:0}
+.row .r-line{display:flex;align-items:baseline;gap:8px}
+.row .r-time{
+  flex:0 0 auto;font-size:14px;font-weight:700;color:#8A5A2B;font-variant-numeric:tabular-nums;
+  min-width:44px;
+}
+.row .r-name{font-size:16px;font-weight:600;line-height:1.45;word-break:break-word}
+.row.done .r-name,.row.rain-out .r-name{color:#A9A199}
+.row.done .r-name{text-decoration:line-through;text-decoration-color:#CFC7BC}
+.row .r-meta{display:block;margin-top:3px;font-size:13px;color:var(--ink-2);line-height:1.5}
+.row .r-tip b{color:#4A3B2C}
+.row .r-tr{color:var(--muted);font-size:12px}
+.row .dotsep{color:#CFC7BC;margin:0 5px;font-size:12px}
+.row .r-alt{
+  display:inline-flex;align-items:center;gap:5px;margin-top:6px;padding:3px 9px;border-radius:999px;
+  background:#EEF3F6;color:#2F5C72;font-size:12px;font-weight:600;
+}
+.row.rain-out .r-name,.row.rain-out .r-meta,.row.rain-out .r-time,.row.rain-out .tick{opacity:.42}
+.row.rain-out .r-alt{opacity:1}
+
+/* 卡内其它块 */
+.blk{margin:10px 6px 0;padding-top:12px;border-top:1px solid var(--line-2)}
+.blk h4{font-size:13px;color:var(--ink-2);margin:0 0 8px;font-weight:700;letter-spacing:.02em}
+.routemap{
+  display:block;width:100%;padding:0;text-align:left;position:relative;
+  border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#F7F3EA;
+}
+.routemap>svg{width:100%;height:auto}
+.routemap .ic{width:18px;height:18px}
+.routemap .rm-open{
+  position:absolute;right:8px;bottom:8px;height:32px;padding:0 11px;border-radius:999px;
+  background:rgba(255,253,249,.94);border:1px solid var(--line);font-size:12px;color:var(--ink-2);
+  display:inline-flex;align-items:center;gap:5px;
+}
+.routemap:active .rm-open{background:#F1EAE2}
+.note{font-size:13px;color:var(--ink-2);background:#FAF7F1;border-radius:10px;padding:10px 12px;line-height:1.6}
+.note+.note{margin-top:8px}
+.note.warn{background:#FDF1EE;color:#8D3A24}
+.note.rain{background:#FDF8EC;color:#7A5D1E;border-left:3px solid var(--gold);border-radius:0 10px 10px 0}
+.note.cut{background:#FDF6F2;color:#8D3A24;border-left:3px solid #E3C3B6;border-radius:0 10px 10px 0}
+.note b{color:inherit}
+.note ul{margin:4px 0 0;padding-left:18px}
+.tagbar{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px}
+.tag{font-size:11.5px;padding:3px 9px;border-radius:999px;background:#F1ECE3;color:#5D554C;white-space:nowrap}
+.tag.warn{background:#FDEEE9;color:#A63A22}
+.tag.note{background:#EEF3EC;color:#41683F}
+.tag.cut{background:#FBF1DD;color:#8A6512}
+.card-act{display:flex;gap:8px;margin-top:14px}
+.card-act .btn{flex:1 1 0}
+
+/* ---------- 卡堆导航 ---------- */
+#deckNav{
+  flex:0 0 auto;height:56px;display:flex;align-items:center;justify-content:center;gap:10px;
+  padding-bottom:2px;
+}
+.nav-btn{
+  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  color:var(--muted);border:1px solid var(--line);background:var(--card);
+}
+.nav-btn:disabled{opacity:.3}
+.nav-btn:active:not(:disabled){background:#F3EEE4}
+#dots{display:flex;align-items:center}
+.dot{
+  width:26px;height:34px;display:flex;align-items:center;justify-content:center;
+}
+.dot i{display:block;width:7px;height:7px;border-radius:99px;background:#D3C9BA;transition:all .25s var(--ease)}
+.dot[aria-current="true"] i{width:20px;background:var(--maple)}
+.dot:active i{background:#B8AD9E}
+
+/* ---------- 通用按钮 ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  min-height:var(--tap);padding:0 14px;border-radius:12px;border:1px solid var(--line);
+  background:var(--card);font-size:14.5px;color:var(--ink);
+}
+.btn:active{background:#F3EEE4}
+.btn.primary{background:var(--maple);border-color:var(--maple);color:#fff}
+.btn.primary:active{background:#A93A24}
+.btn.sm{min-height:38px;font-size:13px;padding:0 11px;border-radius:10px}
+
+/* ---------- Tab 栏 ---------- */
+#tabbar{
+  flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);
+  border-top:1px solid var(--line);background:#FFFCF6;
+  padding-bottom:env(safe-area-inset-bottom);
+}
+#tabbar button{
+  height:var(--tab-h);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:#9C948A;font-size:11.5px;position:relative;
+}
+#tabbar button[aria-selected="true"]{color:var(--maple)}
+#tabbar button[aria-selected="true"]::before{
+  content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:26px;height:3px;border-radius:0 0 3px 3px;background:var(--maple);
+}
+#tabbar .ic{width:23px;height:23px}
+#tabbar .badge{
+  position:absolute;top:6px;right:calc(50% - 22px);min-width:17px;height:17px;padding:0 4px;
+  border-radius:99px;background:var(--maple);color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+
+/* ---------- 地图 Tab ---------- */
+.chips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:0 0 auto;height:36px;padding:0 13px;border-radius:999px;border:1px solid var(--line);
+  background:var(--card);font-size:13px;color:var(--muted);display:flex;align-items:center;gap:6px;
+}
+.chip[aria-pressed="true"]{color:#fff;border-color:transparent;font-weight:600}
+#mapBox{height:min(58vh,440px);border-radius:14px;overflow:hidden;border:1px solid var(--line);background:#EAE4D8}
+#mapHint{font-size:12px;color:var(--muted);margin:8px 2px 12px;line-height:1.5}
+.poilist{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.poi{
+  display:flex;align-items:center;gap:10px;min-height:var(--tap);padding:8px 12px;width:100%;text-align:left;
+}
+.poi+.poi{border-top:1px solid var(--line-2)}
+.poi:active{background:#FAF6EE}
+.poi .n{
+  flex:0 0 auto;width:24px;height:24px;border-radius:50%;color:#fff;font-size:12px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.poi .t{flex:1 1 auto;font-size:15px}
+.poi .t small{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+
+/* ---------- 清单 Tab ---------- */
+.seg{display:flex;gap:4px;background:#EFE9DE;border-radius:12px;padding:4px;margin-bottom:12px}
+.seg button{
+  flex:1 1 0;height:38px;border-radius:9px;font-size:13.5px;color:var(--ink-2);
+}
+.seg button[aria-selected="true"]{background:var(--card);color:var(--ink);font-weight:700;box-shadow:var(--sh-card)}
+.sec{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.sec>h3{font-size:15px;margin:0 0 4px}
+.sec .desc{font-size:12.5px;color:var(--muted);margin:0 0 10px}
+.sub-h{font-size:13px;font-weight:700;color:var(--ink-2);margin:14px 0 4px}
+.sub-h:first-child{margin-top:2px}
+.ck{
+  display:flex;align-items:flex-start;gap:10px;min-height:var(--tap);padding:10px 2px;cursor:pointer;
+}
+.ck+.ck{border-top:1px dashed var(--line-2)}
+.ck .box{
+  flex:0 0 auto;width:22px;height:22px;margin-top:2px;border:2px solid #D3C9BA;border-radius:6px;
+  display:flex;align-items:center;justify-content:center;color:#fff;transition:background .15s,border-color .15s;
+}
+.ck .box svg{width:14px;height:14px;opacity:0}
+.ck input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.ck.on .box{background:var(--pine);border-color:var(--pine)}
+.ck.on .box svg{opacity:1}
+.ck .tx{flex:1 1 auto;font-size:15px;line-height:1.5}
+.ck.on .tx{color:#A9A199}
+.ck .tx small{display:block;font-size:12.5px;color:var(--muted);margin-top:3px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:0 8px 8px 0;border-bottom:1px solid var(--line)}
+td{padding:9px 8px 9px 0;border-bottom:1px dashed var(--line-2);vertical-align:top;line-height:1.5}
+tr:last-child td{border-bottom:0}
+td b{color:#4A3B2C}
+.pbar{height:6px;border-radius:99px;background:#EFE9DE;overflow:hidden;margin:2px 0 12px}
+.pbar>i{display:block;height:100%;width:0;background:var(--pine);border-radius:99px;transition:width .25s}
+
+/* ---------- 更多 Tab ---------- */
+.mrow{display:flex;align-items:center;gap:12px;min-height:var(--tap);padding:12px 14px;width:100%;text-align:left;
+  background:var(--card);border:1px solid var(--line);border-radius:14px;margin-bottom:10px}
+.mrow:active{background:#FAF6EE}
+.mrow .mi{flex:0 0 auto;width:34px;height:34px;border-radius:10px;background:#F1ECE3;color:var(--maple);
+  display:flex;align-items:center;justify-content:center}
+.mrow .mt{flex:1 1 auto;font-size:15px;font-weight:600}
+.mrow .mt small{display:block;font-weight:400;font-size:12.5px;color:var(--muted);margin-top:2px}
+.mrow .mc{flex:0 0 auto;font-size:12.5px;color:var(--muted);display:flex;align-items:center;gap:4px}
+
+/* ---------- 底部抽屉 ---------- */
+.sheet{position:fixed;inset:0;z-index:80;display:flex;flex-direction:column;justify-content:flex-end;
+  background:rgba(43,38,34,.42)}
+.sheet[hidden]{display:none}
+.sheet .sd{
+  background:var(--card);border-radius:18px 18px 0 0;max-height:88vh;display:flex;flex-direction:column;
+  margin:0 auto;width:100%;max-width:480px;animation:up .26s var(--ease);
+}
+@keyframes up{from{transform:translateY(14px);opacity:.6}to{transform:none;opacity:1}}
+.sheet .sh{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--line)}
+.sheet .sh h3{font-size:16px;margin:0;flex:1 1 auto}
+.sheet .sc{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:12px 16px}
+.sheet .sf{flex:0 0 auto;display:flex;gap:8px;padding:10px 16px calc(14px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line)}
+.sheet .sf .btn{flex:1 1 0}
+.x-close{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:var(--muted)}
+#shareText{
+  width:100%;height:46vh;border:1px solid var(--line);border-radius:12px;padding:12px;background:#FCFAF5;
+  font:12.5px/1.6 ui-monospace,SFMono-Regular,Consolas,"Microsoft YaHei",monospace;resize:none;color:#3B342C;
+}
+#sheetMap{height:62vh;border-radius:12px;overflow:hidden;border:1px solid var(--line);background:#EAE4D8}
+#sheetMapInner{height:62vh}
+.leaflet-popup-content{font-size:13px;line-height:1.5;margin:8px 10px}
+.leaflet-popup-content b{color:#A8452A}
+
+/* ---------- 全屏页面（攻略 / 路线图） ---------- */
+.page{
+  position:fixed;inset:0;z-index:95;background:var(--paper);
+  max-width:480px;margin:0 auto;display:flex;flex-direction:column;overflow:hidden;
+  animation:pgIn .22s var(--ease);
+}
+.page[hidden]{display:none}
+@keyframes pgIn{from{transform:translateX(16px);opacity:.55}to{transform:none;opacity:1}}
+.pg-head{
+  flex:0 0 auto;display:flex;gap:8px;align-items:center;
+  padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;
+  background:#FFFCF6;border-bottom:1px solid var(--line);
+}
+.pg-back{
+  width:42px;height:42px;flex:0 0 auto;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  color:var(--ink);background:#F4EFE6;border:1px solid var(--line);
+}
+.pg-back .ic{width:22px;height:22px}
+.pg-back:active{background:#E9E2D6}
+.pg-t{min-width:0}
+.pg-t h3{font-size:17px;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-t div{font-size:12.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pg-body{
+  flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:12px 14px calc(30px + env(safe-area-inset-bottom));
+}
+/* 地图页：地图铺满，顶栏悬浮 */
+.page-map{background:#EAE4D8}
+#fullMap{position:absolute;inset:0;background:#EAE4D8}
+.map-float{
+  position:absolute;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 10px);z-index:600;
+  display:flex;gap:8px;align-items:center;padding:8px 14px 8px 8px;
+  background:rgba(255,253,249,.96);backdrop-filter:blur(6px);
+  border:1px solid var(--line);border-radius:14px;box-shadow:var(--sh-drag);
+}
+.map-float .pg-t h3{font-size:15.5px}
+/* 攻略正文 */
+.gcard{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:12px 14px;margin-bottom:12px}
+.gcard h4{font-size:13.5px;margin:0 0 8px;color:var(--ink-2);font-weight:700}
+.gcard.warnt{background:#FDF8EC;border-color:#EFDFBB}
+.gcard.warnt h4{color:#8A6512}
+.gfeat{font-size:14.5px;line-height:1.68;margin:0}
+.gtags{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:9px}
+.ginfo{width:100%;border-collapse:collapse;font-size:14px}
+.ginfo th{
+  width:86px;text-align:left;vertical-align:top;font-weight:500;font-size:13px;color:var(--muted);
+  padding:7px 10px 7px 0;border-bottom:1px dashed var(--line-2);
+}
+.ginfo td{padding:7px 0;border-bottom:1px dashed var(--line-2);line-height:1.55}
+.ginfo tr:last-child th,.ginfo tr:last-child td{border-bottom:0}
+.gstep{display:flex;gap:9px;padding:8px 0;font-size:14px;line-height:1.6;border-bottom:1px dashed var(--line-2)}
+.gstep:last-child{border-bottom:0}
+.gstep em{
+  flex:0 0 auto;width:20px;height:20px;margin-top:2px;border-radius:50%;background:var(--maple);
+  color:#fff;font-size:11.5px;font-weight:700;font-style:normal;
+  display:flex;align-items:center;justify-content:center;
+}
+.gline{position:relative;padding:7px 0 7px 14px;font-size:14px;line-height:1.62;border-bottom:1px dashed var(--line-2)}
+.gline:last-child{border-bottom:0}
+.gline::before{content:"";position:absolute;left:2px;top:15px;width:5px;height:5px;border-radius:50%;background:#D3C9BA}
+.gline b{color:#4A3B2C}
+.gfoot{font-size:11.5px;color:var(--muted);text-align:center;line-height:1.6;padding:4px 6px 0}
+
+/* ---------- Toast ---------- */
+#toast{
+  position:fixed;left:50%;bottom:88px;transform:translateX(-50%) translateY(6px);z-index:120;
+  background:#2B2622;color:#fff;padding:10px 16px;border-radius:999px;font-size:13.5px;
+  opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:88vw;text-align:center;
+}
+#toast.on{opacity:.95;transform:translateX(-50%)}
+
+/* ---------- 导出容器（离屏，1080 宽海报） ---------- */
+#exportRoot{
+  position:fixed;left:-20000px;top:0;width:1080px;background:#FFFDF9;color:#2B2622;
+  font-family:-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+#exportRoot .x-head{background:linear-gradient(135deg,#43301F,#7A3A24 55%,#A8452A);color:#FFF8F0;padding:52px 56px 44px}
+#exportRoot .x-day{font-size:26px;font-weight:700;letter-spacing:.18em;opacity:.78}
+#exportRoot .x-title{font-size:56px;font-weight:700;margin-top:12px;line-height:1.22}
+#exportRoot .x-theme{font-size:30px;margin-top:16px;opacity:.92;line-height:1.5}
+#exportRoot .x-body{padding:40px 56px 52px}
+#exportRoot table{width:100%;border-collapse:collapse;font-size:30px;table-layout:fixed;word-break:break-word}
+#exportRoot th{font-size:23px;color:#7A726A;font-weight:600;text-align:left;padding:0 0 14px;border-bottom:2px solid #E7DFD2}
+#exportRoot td{padding:17px 14px 17px 0;border-bottom:1px dashed #EFE8DC;vertical-align:top;line-height:1.5}
+#exportRoot td b{color:#4A3B2C;font-weight:700}
+#exportRoot .x-time{width:126px;white-space:nowrap;color:#8A5A2B;font-weight:700}
+#exportRoot .x-tr{width:196px;color:#7A726A;font-size:26px}
+#exportRoot .x-tip{width:286px}
+#exportRoot .x-map{margin:30px 0 6px;border:1px solid #E7DFD2;border-radius:14px;overflow:hidden;background:#F7F3EA}
+#exportRoot .x-note{font-size:27px;background:#FDF6F2;border-left:7px solid #C2452D;border-radius:0 12px 12px 0;
+  padding:20px 24px;margin-top:20px;line-height:1.6;color:#8D3A24}
+#exportRoot .x-rain{font-size:26px;background:#FDF8EC;border-left:7px solid #D98B2B;border-radius:0 12px 12px 0;
+  padding:20px 24px;margin-top:18px;line-height:1.6;color:#7A5D1E}
+#exportRoot .x-foot{font-size:22px;color:#A9A199;text-align:center;margin-top:34px}
+
+@media (max-width:360px){
+  .row-guide{height:30px;padding:0 9px;font-size:11.5px;border-radius:9px}
+  .row-guide .ic{display:none}
+  .ginfo th{width:72px}
+}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;transition-duration:.01ms!important}
+}
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header id="statusBar">
+    <div>
+      <div class="sb-t">南京亲子五日游</div>
+      <div class="sb-s" id="sbSub">11/28–12/2 · 两大一小</div>
+    </div>
+    <button class="sb-right" id="sbBtn" aria-label="查看行前倒计时">
+      <div class="sb-n" id="sbNum">0/0</div>
+      <div class="sb-l">已完成</div>
+      <div class="sb-bar"><i id="sbBar"></i></div>
+    </button>
+  </header>
+
+  <main id="stage">
+    <!-- 行程 -->
+    <section class="panel on" id="p-trip" aria-label="每日行程">
+      <div id="deckWrap"></div>
+      <div id="deckNav">
+        <button class="nav-btn" id="btnPrev" aria-label="前一天"></button>
+        <div id="dots" role="tablist" aria-label="选择日期"></div>
+        <button class="nav-btn" id="btnNext" aria-label="后一天"></button>
+      </div>
+    </section>
+
+    <!-- 地图 -->
+    <section class="panel scroll" id="p-map" aria-label="地图">
+      <div class="chips" id="mapChips"></div>
+      <div id="mapBox"></div>
+      <p id="mapHint"></p>
+      <div class="poilist" id="poiList"></div>
+    </section>
+
+    <!-- 清单 -->
+    <section class="panel scroll" id="p-list" aria-label="清单">
+      <div class="seg" id="listSeg" role="tablist" aria-label="清单分类"></div>
+      <div id="listBody"></div>
+    </section>
+
+    <!-- 更多 -->
+    <section class="panel scroll" id="p-more" aria-label="更多">
+      <div id="moreBody"></div>
+    </section>
+  </main>
+
+  <nav id="tabbar" role="tablist" aria-label="主导航">
+    <button role="tab" data-tab="trip" aria-selected="true"><span class="ic" data-ic="calendar"></span>行程</button>
+    <button role="tab" data-tab="map" aria-selected="false"><span class="ic" data-ic="pin"></span>地图</button>
+    <button role="tab" data-tab="list" aria-selected="false"><span class="ic" data-ic="list"></span>清单</button>
+    <button role="tab" data-tab="more" aria-selected="false"><span class="ic" data-ic="dots"></span>更多</button>
+  </nav>
+</div>
+
+<!-- 全屏路线图 -->
+<div class="page page-map" id="pageMap" hidden>
+  <div id="fullMap"></div>
+  <div class="map-float">
+    <button class="pg-back" data-close-page aria-label="返回"></button>
+    <div class="pg-t"><h3 id="mapTitle">当天路线</h3><div id="mapSub"></div></div>
+  </div>
+</div>
+
+<!-- 全屏攻略 -->
+<div class="page" id="pageGuide" hidden>
+  <div class="pg-head">
+    <button class="pg-back" data-close-page aria-label="返回"></button>
+    <div class="pg-t"><h3 id="guideTitle"></h3><div id="guideSub"></div></div>
+  </div>
+  <div class="pg-body" id="guideBody"></div>
+</div>
+
+<!-- 文字清单 -->
+<div class="sheet" id="sheetText" hidden>
+  <div class="sd">
+    <div class="sh">
+      <h3 id="sheetTextTitle">文字清单</h3>
+      <button class="x-close" data-close aria-label="关闭"></button>
+    </div>
+    <div class="sc"><textarea id="shareText" spellcheck="false" readonly aria-label="文字清单内容"></textarea></div>
+    <div class="sf">
+      <button class="btn" id="btnCopyText">复制全部</button>
+      <button class="btn primary" data-close>关闭</button>
+    </div>
+  </div>
+</div>
+
+<div id="exportRoot" aria-hidden="true"></div>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="vendor/leaflet.js"></script>
+<script src="vendor/html2canvas.js"></script>
+<script>
+/* =====================================================================
+   数据层
+   ===================================================================== */
+const STORE_KEY = 'nj-trip-2026-v1';
+const TRIP_START = '2026-11-28', TRIP_END = '2026-12-02';
+
+/* 站点坐标（近似值，WGS-84；给高德底图前转 GCJ-02） */
+const POI = {
+  '新街口（酒店）':      [32.0418, 118.7833, '地铁 1/2/3 号线交汇'],
+  '南京南站':            [31.9680, 118.7960, '返程 G821 15:25 发车'],
+  '玄武湖（解放门）':    [32.0590, 118.7930, '免费，需预约'],
+  '鸡鸣寺':              [32.0580, 118.7936, '门票 10 元'],
+  '绿博园（沙趣园）':    [32.0300, 118.7060, '免费免预约，8:30–17:30'],
+  '南京博物院':          [32.0435, 118.8236, '需实体身份证原件'],
+  '明孝陵（石象路）':    [32.0552, 118.8320, '70 元，娃免费'],
+  '中山植物园北园':      [32.0534, 118.8311, '15 元，周一闭园'],
+  '音乐台':              [32.0590, 118.8450, '10 元，喂鸽子'],
+  '中山陵':              [32.0620, 118.8500, '免费需预约，周一闭馆'],
+  '下马坊站':            [32.0494, 118.8480, '地铁 2 号线'],
+  '老门东':              [32.0147, 118.7880, '咸亨饭店 / 小吊梨汤'],
+  '夫子庙':              [32.0230, 118.7890, '画舫约 80 元'],
+  '栖霞山站（6 号线）':  [32.1489, 118.9454, '出站步行约 700 米'],
+  '栖霞山（西门）':      [32.1508, 118.9480, '红枫节 80 元'],
+  '栖霞古镇':            [32.1485, 118.9430, '素面 / 肯德基']
+};
+
+/* 每日行程： [时间, 安排, 交通, 提示, 雨天备案?] */
+const DAYS = [
+{
+  id:'d1', no:'DAY 1', hex:'#3F7F96',
+  date:'11/28', week:'周六', weather:'晴', temp:'5～17℃',
+  theme:'玄武湖热身', lead:'全平地热身，倒时不累',
+  traffic:'高铁 1h09m ＋ 地铁约 30 分钟',
+  tags:[{t:'集合日',c:'note'},{t:'17:10 天黑',c:'warn'}],
+  cut:'鸡鸣寺。娃在车上睡着就 11 点到，砍掉它，下午全休。',
+  rainNote:'玄武湖、鸡鸣寺取消 → 德基广场 / 新街口商场室内儿童区。今天是集合日，砍掉不心疼。',
+  rows:[
+    ['06:30','起床、出门','—','早饭在东站解决'],
+    ['07:47','G38 发车','高铁','靠过道座位'],
+    ['08:56','抵南京南','地铁 1 号线','往新街口方向，约 25 分钟'],
+    ['09:40','酒店寄存行李','步行','还不能入住，先玩'],
+    ['10:20','玄武湖公园','1 号线玄武门站','免费但<b>需预约</b>；从解放门进最近','取消 → 德基广场 / 新街口商场室内儿童区'],
+    ['11:30','午餐：Full Thai','步行','金陵 STYLE 一楼，看湖'],
+    ['12:30','回酒店午睡','地铁','今天唯一必须守住的时段'],
+    ['15:00','鸡鸣寺','3 号线鸡鸣寺站，步行 300 米','门票 10 元；⚠️ 17:10 天黑，别拖太晚','取消 → 新街口商场室内区'],
+    ['17:00','晚餐：南京大牌档狮子桥店','步行','美龄粥、阳春面，娃能吃'],
+    ['18:30','回酒店','地铁','顺路买水果酸奶备第二天']
+  ],
+  route:['南京南站','新街口（酒店）','玄武湖（解放门）','鸡鸣寺','新街口（酒店）']
+},
+{
+  id:'d2', no:'DAY 2', hex:'#5F8F4A',
+  date:'11/29', week:'周日', weather:'晴', temp:'8～20℃',
+  theme:'绿博园挖沙 ＋ 南博', lead:'上午撒欢、下午躲进空调馆',
+  traffic:'地铁约 1 小时 40 分钟（分两段）',
+  tags:[{t:'周末人多',c:'warn'},{t:'南博需实体身份证',c:'warn'}],
+  cut:'南博贪多。娃对博物馆兴趣有限，看到烦了就撤。',
+  rainNote:'上午绿博园取消 → 新街口商场室内区；下午南京博物院照常（本来就在室内）。',
+  notice:'<b>11/29 是周日</b>：南博、中山陵均开放，但周末名额紧、人也多。<br><b>抢票提醒</b>：本日南博门票按「提前 7 天 18:00」规则应在 <b>11/22 18:00</b> 放出，已过窗口，请立刻查余票或改日。',
+  noticeCls:'',
+  rows:[
+    ['08:30','酒店早餐','—','—'],
+    ['09:30','绿博园','10 号线绿博园站 2 号口，步行 5–10 分钟到东门','<b>免费、免预约</b>；8:30–17:30','取消 → 上午改新街口商场室内区'],
+    ['10:00','沙趣园挖沙','园内','近 3 个足球场大，自带彩虹滑梯、攀爬网、秋千','取消'],
+    ['10:00','荷兰园拍照','园内','风车＋花田','取消'],
+    ['11:30','午餐：园区简餐 / 打车去河西万达','—','—','改新街口午餐'],
+    ['12:30','回酒店午睡','地铁','10 号线直达'],
+    ['14:30','前往南京博物院','10 号线→元通换 2 号线→明故宫站，约 55 分钟','⚠️ <b>凭实体身份证原件人脸核验</b>'],
+    ['15:00','南京博物院','2 号线明故宫站 1 号口，步行 5 分钟','只盯<b>历史馆＋民国馆</b>，1.5～2 小时'],
+    ['17:00','晚餐：寻魏·金陵十二菜','打车','维景 38 楼，看玄武湖']
+  ],
+  route:['新街口（酒店）','绿博园（沙趣园）','新街口（酒店）','南京博物院','新街口（酒店）']
+},
+{
+  id:'d3', no:'DAY 3', hex:'#C58A1F',
+  date:'11/30', week:'周一', weather:'晴', temp:'9～19℃',
+  theme:'钟山片区｜银杏巅峰', lead:'踩银杏巅峰期，避开爬山硬指标',
+  traffic:'打车＋步行（多次短途打车）',
+  tags:[{t:'周一，植物园闭园',c:'warn'},{t:'银杏巅峰',c:'note'},{t:'17:10 天黑',c:'warn'}],
+  cut:'中山植物园。周一闭园去不了，砍掉它，明孝陵＋石象路多逛一会儿。',
+  rainNote:'石象路小雨照常出片；音乐台、老门东、夫子庙取消 → 德基 / 新街口室内。注意南博周一闭馆，不能当备选。',
+  notice:'<b>11/30 是周一，本日行程与闭馆日冲突</b>：南京博物院、中山陵闭馆，<b>中山植物园也周一闭园</b> —— 本日 10:30 的「植物园北园 / 桥世界 / 前湖捞虾」当天全部去不了。<br>可用的：<b>明孝陵石象路</b>（现场买票，不闭馆）、老门东、夫子庙。若坚持去植物园，需与 Day4（12/1 周二）或 Day5（12/2 周三）调换。',
+  noticeCls:'warn',
+  rows:[
+    ['08:00','酒店早餐','—','—'],
+    ['09:00','前往明孝陵','打车到 3 号门（苜蓿园站），约 25 元','省腿'],
+    ['09:20','明孝陵石象路神道','步行','70 元，娃免费；<b>银杏 11 月底到 12 月初巅峰</b>','小雨照常出片；中大雨改德基 / 新街口室内'],
+    ['10:30','中山植物园北园','步行，明孝陵 1 号门对面','15 元；⚠️ <b>本日周一闭园，去不了</b>'],
+    ['10:30','桥世界（17 座奇桥）','园内','3 岁娃专属探险场','取消（园闭）'],
+    ['10:30','前湖溢洪沟「南京小九寨」','园内','<b>可带捞网捞小虾</b>，免费','取消（园闭）'],
+    ['11:30','午餐：植物园简餐 / 自带','—','园内餐饮一般，建议自带三明治'],
+    ['12:30','回酒店午睡','打车','今天强度最大，必须回'],
+    ['15:00','音乐台喂鸽子','打车到中山陵景区，10 元','娃最爱的环节，多带点面包屑','取消 → 德基广场室内儿童区'],
+    ['16:30','老门东','打车','咸亨饭店 / 小吊梨汤；⚠️ 17:10 天黑，注意保暖','石板路湿滑 → 改新街口商场室内区'],
+    ['18:00','夫子庙夜景','步行可达','秦淮河画舫约 80 元；<b>娃必须戴防走失手环</b>','取消']
+  ],
+  route:['新街口（酒店）','明孝陵（石象路）','中山植物园北园','新街口（酒店）','音乐台','老门东','夫子庙']
+},
+{
+  id:'d4', no:'DAY 4', hex:'#C2452D',
+  date:'12/1', week:'周二', weather:'晴转多云', temp:'11～20℃',
+  theme:'栖霞山红叶', lead:'红叶颜值巅峰（10/18–12/18 红枫节）',
+  traffic:'地铁 6 号线往返，单程约 1 小时',
+  tags:[{t:'周二，栖霞山正常',c:'note'},{t:'1.4m 以下免票需约',c:'cut'}],
+  cut:'下午室内儿童区。累了直接回酒店休息。',
+  rainNote:'栖霞山山路湿滑，直接放弃 → 德基 / 新街口室内儿童区＋德基书店。想补课可抢 <b>12/1 南博</b>（周二开放，需 11/24 18:00 抢票）。注意原文的「南京科技馆」周二闭馆，不能用。',
+  rows:[
+    ['07:00','酒店早餐（可打包包子）','—','今天要赶早'],
+    ['07:40','出发','地铁经新街口换 <b>6 号线</b>→栖霞山站，约 50 分钟','全程约 1 小时','取消'],
+    ['08:40','1 号口出，步行 700 米到西门','步行','—','取消'],
+    ['09:00','栖霞山精华松弛线','—','门票 80 元（红枫节价）','山路湿滑 → 改德基 / 新街口室内（备选：南博）'],
+    ['09:00','明镜湖 → 栖霞古寺 → 舍利塔 → 千佛岩 → 红叶谷 → 桃花湖','步行＋观光车','<b>不建议登顶</b>；观光车上行单程 20 元、分段 10 元/段','取消'],
+    ['11:30','下山，栖霞古镇午餐','—','素面或肯德基都有','取消'],
+    ['12:30','返程','地铁 6 号线','—','取消'],
+    ['13:30','回酒店午睡','—','—'],
+    ['16:00','新街口商场室内儿童区 / 德基书店','步行','弹性时段，累了就直接休息'],
+    ['18:00','晚餐：源香潮汕粥 / 点都德','步行','清淡，收尾不负担']
+  ],
+  route:['新街口（酒店）','栖霞山站（6 号线）','栖霞山（西门）','栖霞古镇','栖霞山站（6 号线）','新街口（酒店）'],
+  notes:[
+    {h:'门票要点', list:['红枫节 80 元（10/18–12/18）','<b>1.4 米以下免票，但要提前在官方公众号「栖霞山风景区」单独约免费票</b>','建议前一晚买好，别当天排队']},
+    {h:'省时技巧', list:['西门游客服务中心：<b>免费借婴儿车、免费寄存行李</b>','观光车上行坐车、下行步行，最省力','⚠️ <b>傍晚极难打车、公交挤爆，地铁返程最稳</b>，建议 17:00 前离园']}
+  ]
+},
+{
+  id:'d5', no:'DAY 5', hex:'#6F63A0',
+  date:'12/2', week:'周三', weather:'多云转晴', temp:'10～17℃',
+  theme:'中山陵 ＋ 返程', lead:'轻松收尾，不赶',
+  traffic:'地铁 2 号线＋1 号线，返程 15:25 发车',
+  tags:[{t:'周三，墓室开放',c:'note'},{t:'提前 2 小时到站',c:'warn'}],
+  cut:'中山陵。娃状态不好就睡到自然醒，老门东吃早茶后提前走，改签 12 点左右的车。',
+  rainNote:'中山陵取消 → 提前去南京南，改签 12 点左右的早班车。今天本来就要赶车，砍掉不亏。',
+  rows:[
+    ['07:30','退房，行李寄前台','—','—'],
+    ['08:30','前往中山陵','地铁 2 号线苜蓿园 / 下马坊站','—','取消 → 直接去南京南、改签早班车'],
+    ['09:00','中山陵','—','免费但<b>须预约</b>；⚠️ <b>墓室仅周二至周五开放</b>，12/2 是周三，正好赶上','取消'],
+    ['09:00','走左侧沥青服务道','—','800 米平缓路直通祭堂，<b>完全避开 392 级台阶，推车友好</b>','取消'],
+    ['10:30','回新街口取行李','地铁 2 号线','—'],
+    ['11:30','午餐：鸡鸣汤包 / 回味鸭血粉丝','步行','鸭血粉丝可要求不辣'],
+    ['12:30','前往南京南站','地铁 1 号线，约 35 分钟','—'],
+    ['13:30','到站、安检、候车','—','留足余量'],
+    ['15:25','G821 发车','高铁','—'],
+    ['17:08','抵杭州东','—','到家吃晚饭']
+  ],
+  route:['新街口（酒店）','下马坊站','中山陵','新街口（酒店）','南京南站']
+}];
+
+/* 行前倒计时 */
+const COUNTDOWN = [
+  ['今天','抢 G38（11/28）、G821（12/2）','最高',1],
+  ['今天','订酒店 4 晚，锁新街口—大行宫','最高',1],
+  ['今天','在南博小程序录入参观人信息（姓名＋身份证号）','最高',1],
+  ['已错过','南博 11/29 场的票（提前 7 天＝11/22 18:00）→ 立刻查余票','最高',1],
+  ['11/25 16:00','抢中山陵预约（12/2 场）','最高',1],
+  ['11/25 18:00','抢南京博物院票（12/2 场），代约亲子票','最高',1],
+  ['11/27 晚','栖霞山官方公众号买票（娃免票也要约）','高',0],
+  ['11/27 晚','所有预约截图存相册，连同订单号','高',0],
+  ['11/27 晚','叫车软件存好南京儿童医院地址','中',0],
+  ['11/27 晚','打包行李','中',0],
+  ['11/27 晚','手机下载离线地图（山上会没信号）','中',0],
+  ['出发日 06:30','起床，06:50 出门，07:15 进站','最高',1]
+];
+
+/* 交通与住宿 */
+const TRAIN_OUT = [['G38（已选）','07:47 → 08:56','1h09m','141 元'],
+  ['G3192','07:29 → 08:44','1h15m','约 127 元'],['G814','06:50 → 08:19','1h29m','120 元'],
+  ['G756','08:57 → 10:21','1h24m','约 127 元']];
+const TRAIN_BACK = [['G821（已选）','15:25 → 17:08','1h43m'],['G592','15:32 → 17:00','1h28m'],
+  ['G7613','17:47 → 19:09','1h22m']];
+const TIMELINE = [
+  {t:'出发日 11/28', s:[['06:30','起床'],['06:50','出门'],['07:15','进杭州东站'],['07:30','开始检票'],['07:47','G38 发车'],['08:56','抵南京南 → 地铁 1 号线'],['09:40','到酒店寄存行李']]},
+  {t:'返程日 12/2', s:[['12:30','新街口上地铁 1 号线'],['13:10','抵南京南站（留 2 小时余量）'],['13:30','安检、候车、吃东西'],['15:25','G821 发车'],['17:08','抵杭州东']]}
+];
+const STAY_WHY = ['地铁 1、2、3 号线交汇，换乘不超过一次','南京南站地铁直达不换乘，约 25 分钟',
+  '周边商场密集，<b>下雨也有地方待</b>','餐饮选择多，娃挑食随时能换'];
+const STAY_ASK = ['能否加<b>婴儿床 / 床围</b>？','房间有没有<b>浴缸</b>？（娃洗澡快很多）',
+  '房间在几楼、离电梯远不远？（推车＋行李）','能否 <b>14:00 提前入住</b>、次日<b>延迟退房</b>？'];
+
+/* 预约 */
+const BOOKING = [
+  ['南京博物院','必须','提前 7 天 18:00','免费','周一闭馆；14 岁以下须大人代约<b>亲子票</b>；<b>凭实体身份证原件人脸核验</b>；累计 3 次爽约冻结 90 天'],
+  ['中山陵','必须','提前 7 天 16:00','免费','周一闭馆；<b>墓室仅周二至周五开放</b>'],
+  ['栖霞山','建议提前买','官方公众号','80 元','1.4 米以下免票但须单独约免费票；前一晚买好'],
+  ['玄武湖','需预约','现场可约','免费','提前约更稳'],
+  ['中山植物园','需预约','公众号分时段实名','北园 15 / 南园 45 / 通票 50','1.4 米以下免票但也要约；<b>周一闭园</b>'],
+  ['绿博园','不用','—','免费','8:30–17:30'],
+  ['明孝陵','现场买','—','70 元，娃免费','—'],
+  ['音乐台','现场买','—','10 元','—'],
+  ['鸡鸣寺','现场买','—','10 元','—']
+];
+const BOOK_TIPS = ['今天就把参观人信息录进南博小程序，放票时直接勾选',
+  '设好 <b>11/25 15:55 和 17:55</b> 两个闹钟',
+  '南博周末名额常在 20 分钟内抢空',
+  '抢不到别慌：改总统府（现场买票）或商场室内区'];
+
+/* 行李 */
+const PACKING = [
+  {h:'6.1 证件袋（随身不托运）', items:['大人身份证 ×2（<b>南博必须实体证原件</b>）','娃的身份证，或户口本页','出生证明（备用）','所有预约截图 ＋ 订单号','医保卡 ×2']},
+  {h:'6.2 娃的装备', items:['<b>轻便伞车</b>（石板路颠，比高景观车好推）','<b>防走失手环</b>（夫子庙、老门东人挤，必戴）','保温杯','常吃零食（饼干、溶豆、海苔）','安抚玩具 / 小毯子','换洗衣物 ×3 套','<b>捞网和小桶</b>（前湖捞小虾）','挖沙工具一套']},
+  {h:'6.3 药包', items:['退烧药（美林 / 泰诺林）','止泻药 ＋ 口服补液盐','益生菌','创可贴、碘伏棉签','体温计','儿童感冒药','防蚊虫叮咬膏','晕车贴']},
+  {h:'6.4 大人杂物', items:['<b>轻便雨衣 ×3</b>（比伞好用，要腾手推车）','充电宝 ＋ 数据线','小背包','折叠购物袋','密封袋 ×5','湿巾 ＋ 纸巾（多带）','一次性马桶垫','小零食和水（排队时救命）']},
+  {h:'6.5 手机里存好', items:['离线地图（山上会没信号）','本文 / 行程截图','所有订单号截图','南京市儿童医院广州路院区地址','叫车软件装好并登录']}
+];
+
+/* 餐饮 / 穿衣 / 天气 */
+const EAT = [['玄武湖','Full Thai（金陵 STYLE 一楼）','泰式简餐','看湖景'],
+  ['狮子桥','南京大牌档','美龄粥、阳春面、盐水鸭','娃友好'],
+  ['玄武湖畔','寻魏·金陵十二菜（维景 38 楼）','金陵菜','看玄武湖全景'],
+  ['老门东','咸亨饭店 / 小吊梨汤','淮扬菜、梨汤','逛完就吃'],
+  ['新街口','源香潮汕粥 / 点都德','粥、虾饺、肠粉','清淡收尾'],
+  ['新街口','鸡鸣汤包','汤包','注意烫，先咬开吹'],
+  ['新街口','回味鸭血粉丝','鸭血粉丝汤','<b>可要求不辣</b>'],
+  ['栖霞古镇','素面 / 肯德基','—','山下选择有限，别挑']];
+const MUST_EAT = ['盐水鸭','美龄粥','鸭血粉丝','汤包','桂花糖芋苗','梅花糕'];
+const WEATHER = [['11/28 周六','晴','5～17℃','约 17:10'],['11/29 周日','晴','8～20℃','约 17:10'],
+  ['11/30 周一','晴','9～19℃','约 17:12'],['12/1 周二','晴转多云','11～20℃','约 17:12'],
+  ['12/2 周三','多云转晴','10～17℃','约 17:13']];
+const LAYERS = ['贴身｜长袖纯棉','中间｜薄绒卫衣','最外｜<b>可收纳轻薄羽绒</b>，热了塞进妈咪包'];
+const CLOTHES_CHECK = ['围巾、帽子、手套','每人一套室内短袖（商场博物馆有暖气）','舒适防滑的运动鞋（要走 5 天）'];
+
+/* 突发预案 */
+const PLANB = [
+  {h:'娃中途困了', n:'宁可少玩一个点，也别让娃在车上崩溃。', tb:[
+    ['地铁上睡着','<b>别硬叫醒</b>，坐着睡 20 分钟，到站再下车'],
+    ['景区里犯困','伞车放平 ＋ 盖外套，推到阴凉处'],
+    ['明显没精神','<b>直接打车回酒店</b>，晚上不补']]},
+  {h:'下雨', tb:[['小雨','玄武湖、鸡鸣寺照常，穿雨衣推车，人反而少'],
+    ['中大雨','卡头打开「雨天版」，自动换室内'],
+    ['栖霞山遇雨','直接换室内场馆，不可惜'],
+    ['石象路遇雨','雨中反而出片，穿雨衣能走']],
+    n:'雨衣优于雨伞 —— 要腾手推车。'},
+  {h:'娃生病', list:['<b>南京市儿童医院广州路院区</b>：打车约 15 分钟','轻微感冒：酒店休息一天，<b>别硬撑</b>','医保：先自费后回杭报销，<b>留存票据</b>']},
+  {h:'误车 / 晚点', list:['误了接驳<b>直接坐地铁</b>（25 元内，打车 50+ 还堵）','返程提前 2 小时到站']},
+  {h:'预约没抢到', tb:[['南博','总统府（现场买票）'],['中山陵','博爱坊、音乐台一带同样好看'],['栖霞山','前 1 天可退，多刷可能有余票']]},
+  {h:'走失', list:['出门前给娃<b>戴防走失手环</b>，写上大人手机号','给娃拍一张当天全身照（记衣服颜色）','约好「找不到就站在原地别动」']},
+  {h:'东西丢了', list:['手机：借别人手机打自己号码 / 挂失','证件：酒店前台先复印留档','推车：景区游客中心问，多能找回']}
+];
+
+/* 预算 / 速查 */
+const BUDGET = [['高铁往返','约 850 元','141×2 人×2 程；<b>娃免费</b>'],
+  ['住宿 4 晚','1600～2800 元','经济型 / 舒适型'],['餐饮','约 1500 元','5 天，含 2～3 顿正餐/天'],
+  ['门票','约 250 元','明孝陵 70×2、栖霞山 80×2、植物园 15×2…；<b>娃基本免票</b>'],
+  ['市内交通','约 300 元','地铁为主＋几次打车']];
+const METRO = [['玄武湖（玄武门）','1 号线','玄武门站'],['玄武湖（解放门）/ 鸡鸣寺','3 号线','鸡鸣寺站'],
+  ['南京博物院','2 号线','明故宫站 1 号口'],['绿博园','10 号线','绿博园站 2 号口'],
+  ['明孝陵','2 号线','苜蓿园站'],['中山陵 / 音乐台','2 号线','下马坊站'],
+  ['栖霞山','6 号线','栖霞山站 1 号口'],['南京南站 ↔ 新街口','1 号线','直达，约 25 分钟']];
+const HOURS = [['南京博物院','9:00–17:00（16:00 停止入馆）','周一'],
+  ['中山陵','8:30–17:00','周一（墓室仅周二至周五）'],
+  ['中山植物园','冬季 8:30–17:00','周一'],
+  ['绿博园','8:30–17:30','—'],['栖霞山','7:00–17:30','—'],
+  ['南京科技馆','9:00–17:00（16:00 停止入园）','周一、周二']];
+const PHONES = ['<b>南京市儿童医院广州路院区</b>：广州路 72 号，打车约 15 分钟',
+  '南京南站：地铁 1、3、S1 号线','高铁客服：12306'];
+const TOP3 = ['<b>11/25 两个闹钟</b>是整趟行程唯一的硬瓶颈，错过就得改方案',
+  '<b>身份证原件</b>必须带，南博人脸核验不认电子版',
+  '<b>每天守住午睡</b>，砍景点都别砍它'];
+
+/* =====================================================================
+   景点攻略：哪些行程行是景点（dayId|行序号 → 攻略 id）
+   ===================================================================== */
+const ROW_GUIDE = {
+  'd1|4':'xuanwu', 'd1|7':'jiming',
+  'd2|1':'lvbo', 'd2|2':'lvbo', 'd2|3':'lvbo', 'd2|6':'njmuseum', 'd2|7':'njmuseum',
+  'd3|1':'mingxiaoling', 'd3|2':'mingxiaoling',
+  'd3|3':'botanical', 'd3|4':'botanical', 'd3|5':'botanical',
+  'd3|8':'yinyuetai', 'd3|9':'laomendong', 'd3|10':'fuzimiao',
+  'd4|3':'qixiashan', 'd4|4':'qixiashan',
+  'd5|1':'zhongshanling', 'd5|2':'zhongshanling'
+};
+
+const GUIDES = {
+  xuanwu: {
+    name:'玄武湖公园', sub:'江南三大名湖 · 南京的城市客厅',
+    tags:[{t:'免费'},{t:'推车友好',c:'note'},{t:'日落机位',c:'cut'}],
+    feat:'五洲（环洲烟柳、樱洲花海、菱洲山岚、梁洲秋菊、翠洲云树）用桥堤串起来，洲与洲之间步行只要 3–8 分钟。湖 + 明城墙 + 紫金山同框，这是南京独有的取景。2026 年 11 月正在公示拟升国家 5A。',
+    info:[['门票','免费'],['开放','环湖路 24 小时；五洲区域 11–3 月 6:00–21:00（晚上会闭园）'],
+      ['闭馆','无'],['预约','不用'],['建议时长','2.5–3.5 小时'],['推车','全平路，好推'],['入园','1 号线玄武门站／3·4 号线鸡鸣寺站（解放门）']],
+    route:['解放门进 → 台菱堤（可登城墙俯瞰全湖）→ 菱洲（儿童乐园在这一带）',
+      '樱洲 → 梁洲（银杏大道，秋天的主角）',
+      '翠洲 → 情侣园（欧式小教堂 + 风车草坪）',
+      '十里长堤 → 玄武门出，这一带是拍日落最好的地方',
+      '走累了坐观光车：单站 10 元、环线 30 元；环湖小火车 50 元（只在玄武门和解放门设点）'],
+    kid:['五洲区域晚上闭园，夜游只能走环湖路',
+      '不少亲水平台没有护栏，拍照别贴水边',
+      '直饮水点很少，自带水；秋末湖边风大，带件薄外套',
+      '菱洲的儿童乐园（前身是玄武湖动物园）是娃的放电点'],
+    avoid:['观光车和环湖小火车上车站点不通用，别搞混','别为了凑齐五个洲的名字硬走全，会废腿']
+  },
+  jiming: {
+    name:'鸡鸣寺', sub:'"南朝四百八十寺"之首 · 尼众道场',
+    tags:[{t:'1700 年古刹'},{t:'登塔看玄武湖',c:'note'}],
+    feat:'南朝四百八十寺之首，梵音 1700 年不绝。标志是黄墙 + 药师佛塔，登塔能俯瞰玄武湖。朱自清《南京》里劝人"选一个微雨天或月夜"来 —— 寺最高处的豁蒙楼（今百味斋）正对玄武湖与明城墙。',
+    info:[['门票','10 元（1.4m 以下儿童、60 岁以上免费）'],['开放','7:30–17:00（16:45 停止入园）；农历初一、十五 5:30 开'],
+      ['闭馆','无'],['预约','不用'],['建议时长','1 小时'],['推车','不好推（依山而建、台阶多）'],['位置','玄武区鸡鸣寺路 1 号']],
+    route:['山门 → 大雄宝殿（毗卢殿）→ 药师佛塔（7 层 8 面，塔内供药师佛铜像）',
+      '入寺可领三炷香；斋堂有素斋面、素饺、桂花糕',
+      '出北门就是台城明城墙 —— 一寺一湖一城垣连成一线',
+      '想拍"鸡鸣寺 + 玄武湖同框"，上解放门段的台城'],
+    kid:['寺不大但要一路向上，推车不好使，这天建议用背带',
+      '寺内空间小，人一多就挤，上午比下午清静',
+      '17:10 天黑，别晚于 16:30 才上山门'],
+    avoid:['门口的看相、算命一概别理','"鸡鸣寺"和"古鸡鸣寺"是同一个地方，不是两个寺']
+  },
+  lvbo: {
+    name:'绿博园（沙趣园 + 荷兰园）', sub:'长江边的免费滨江公园',
+    tags:[{t:'免费免预约',c:'note'},{t:'玩沙半天'},{t:'荷兰风车',c:'cut'}],
+    feat:'园区大到能待半天，沿江乌桕、枫香、水杉成片。核心是沙趣园 —— 近 3 个足球场大的白沙滩 + 滑梯 + 攀爬网 + 秋千 + 蹦床；另有荷兰友谊园（大风车 + 欧式小教堂 + 草坪）、左岸花海、沿江亲水栈道。',
+    info:[['门票','免费、免预约'],['开放','8:30–17:30'],['闭馆','无'],['建议时长','2–3 小时'],
+      ['推车','好推'],['位置','建邺区扬子江大道 228 号'],['入园','10 号线绿博园站 2 号口，步行 5–10 分钟到东门']],
+    route:['东门进 → 沙趣园挖沙（留 1.5–2 小时）',
+      '沿江亲水栈道 → 荷兰园拍照',
+      '左岸花海 → 出园',
+      '玩沙最佳时段：上午 9:30–11:30 或下午 14:00–16:00，避开正午'],
+    kid:['必须带换洗衣物（沙 + 水，一定会湿）',
+      '沙区有围挡、洗手池、遮阳棚，家长可以坐旁边看',
+      '挖沙工具现场能买但贵，自带一套 + 捞网小桶',
+      '江边风大，秋末明显比市区凉，防风外套必备'],
+    avoid:['园区大、出口分散，记好从哪个门进来的','中大雨没有室内备选，直接改商场']
+  },
+  njmuseum: {
+    name:'南京博物院', sub:'中国三大博物馆之一 · 一院六馆',
+    tags:[{t:'必须预约',c:'warn'},{t:'禁带推车',c:'warn'},{t:'周一闭馆'}],
+    feat:'家底 42 万余件。历史馆按朝代拉时间线（恐龙骨架、金缕衣、竹林七贤砖画）；民国馆整层复原民国街景（有轨电车、民国邮局可盖南博邮戳、先锋书店）；镇院之宝是明正统鎏金藏式佛塔，出土于牛首山弘觉寺塔地宫。',
+    info:[['门票','免费'],['开放','9:00–17:00（16:00 停止检票）'],['闭馆','周一（法定节假日除外）'],
+      ['预约','全员实名：每日 18:00 放票，可约未来 7 天（不含当日）；分上午 9:00–13:00 / 下午 12:00–16:00，错过时段谢绝入馆'],
+      ['亲子','14 周岁及以下不能单独约，须大人代约亲子票，每名成人最多带 3 名'],
+      ['建议时长','2–4 小时'],['推车','❌ 禁带（折叠推车、滑板车、平衡车都在禁止清单）'],
+      ['交通','地铁 2 / 6 号线明故宫站 1 号口向东 300 米']],
+    route:['历史馆（六厅）→ 特展馆（镇院之宝）→ 数字馆',
+      '民国馆 —— 场景化、能跑能看、拍照最友好',
+      '非遗馆（14:00–16:00 有昆曲／白局／评弹；小剧场有免费 3D 短片约 20 分钟）',
+      '艺术馆收尾',
+      '带 3 岁娃的删减版：历史馆挑 1–2 个厅 + 民国馆 + 数字馆，别贪多',
+      '五楼有休息区和观景平台，累了上去缓冲'],
+    kid:['禁带推车 → 提前把推车放酒店，全程抱着或让娃走',
+      '展厅和指定区域禁止饮食（泡面、自热锅、盒饭、榴莲都禁），零食别在展厅里喂',
+      '安检要把液体、相机、雨伞单独取出过手检，排队会慢，留足时间',
+      '高峰时艺术馆侧门排队比历史馆正门短'],
+    avoid:['没有"现场补救"通道，没预约就是进不去',
+      '90 天内累计 3 次爽约，证件会被限制预约 90 天 —— 去不了务必取消',
+      '每天 10:00 和 14:00 历史馆、特展馆有免费定时讲解（一场 30 人）']
+  },
+  mingxiaoling: {
+    name:'明孝陵 · 石象路神道', sub:'南京唯一的世界文化遗产',
+    tags:[{t:'世界遗产'},{t:'神道 615 米',c:'note'},{t:'当季已过峰',c:'warn'}],
+    feat:'朱元璋与马皇后合葬陵。真正的看点不是陵宫，是那条神道：石象路 615 米，六种石兽（狮、獬豸、骆驼、象、麒麟、马）一立一跪成对排列，后接文臣武将的翁仲路。和北京十三陵不同，这条神道绕着原有山丘弯曲，所以走起来像散步而不是仪仗。',
+    info:[['门票','单票 70 元（线上提前一天约 68）；钟山联票 100 元含明孝陵+灵谷+美龄宫+音乐台（分开买约 145）'],
+      ['开放','2–11 月 6:30–18:30；12 月–1 月 7:00–17:30'],
+      ['闭馆','无（明孝陵博物馆周一闭馆）'],['建议时长','2–3 小时'],
+      ['推车','神道中段有少量台阶要抬车，平缓主路可推'],['观光车','单次 10 元、当日不限次 30 元（车上买）']],
+    route:['5 号门进 = 石象路东端（苜蓿园站 1 号口步行 10–15 分钟）',
+      '想拍逆光／丁达尔光：1 号门进去 1 分钟就是第一尊石象，这是最经典机位',
+      '3 号门进可先看燕雀湖 + 长生鹿苑，再走到神道',
+      '完整线：大金门 → 四方城 → 石象路 → 翁仲路 → 棂星门 → 文武方门 → 享殿遗址 → 方城明楼 → 宝顶',
+      '神道和陵宫在空间上是分开的，跟着导览图走，否则会走过岔口、错过最好的一段',
+      '地宫从未发掘，不要期待能下去'],
+    kid:['落叶不扫，青石板上有露水会滑 —— 防滑鞋是这天最不该省的东西',
+      '3 号门内的长生鹿苑能看梅花鹿，是娃唯一"停不下来"的点',
+      '陵宫到宝顶还要再走约 20 分钟，不想走就在方城明楼外面看一眼宝顶就撤'],
+    alert:'中山陵园管理局 2026-10-30 公告石象路已进入最佳观赏期，官方窗口是"10 月下旬至 12 月初"，当季实拍约在 11 月中旬收尾 —— 你 11/30 来大概率已经过峰。<br>替代重心（正在峰值）：<b>3 号门的燕雀湖落羽杉林</b>（墨绿→焦糖→绯红）、<b>前湖月牙堤乌桕</b>（清晨有雾时最梦幻）。',
+    avoid:['景区比地图上看起来大得多，观光车当日不限次 30 元很值',
+      '景区餐饮又贵又少，下山到苜蓿园一带吃（人均 25–60，没有景区溢价）',
+      '12 月–1 月 17:30 就闭园，冬季天黑早，别安排太晚']
+  },
+  botanical: {
+    name:'中山植物园', sub:'中国第一座国立植物园（1929）· 国家 5A',
+    tags:[{t:'人少清静',c:'note'},{t:'红枫岗'},{t:'周一闭园'}],
+    feat:'南北两园被太平门路分开：北园是老园（银杏大道、红枫岗、桥世界），南园（植物博览园）临前湖（月牙堤、热带植物宫、禾草园）。它最大的价值是 —— 看红叶和银杏的人流量远低于明孝陵和栖霞山。',
+    info:[['门票','北园 15 元 / 南园 45 元 / 南北园通票 50 元；1.4m 以下儿童免票（须购票成人陪同）'],
+      ['开放','10 月–次年 4 月 8:30–17:00（16:30 停止入园）'],['闭馆','周一（法定节假日除外）'],
+      ['预约','须公众号「南京中山植物园」分时段实名预约，免票的娃也要约'],
+      ['建议时长','2 小时'],['推车','主路可推'],['电话','025-84347036']],
+    route:['<b>红枫岗</b>（100 余种槭树、约 5000 ㎡）→ <b>北园</b>，11 月下旬起最佳，可维持到 12 月中',
+      '<b>银杏大道</b> → 北园，上世纪 50 年代古树交织成的金色隧道',
+      '<b>桥世界</b>（17 座奇桥）→ 北园，3 岁娃专属探险场，一口气从头玩到尾',
+      '<b>月牙堤</b>（以乌桕为主）→ 南园一侧，前湖倒影 + 明城墙遥相呼应',
+      '<b>热带植物宫</b> → 南园，三片叶子造型玻璃温室，室内不怕冷',
+      '想在同一个园里解决：北园 15 元性价比最高；想看红枫岗 + 前湖就买通票 50 元'],
+    kid:['园区很大很野，带防蚊喷雾（即便秋末）','园内不采摘秋果；乌桕有毒，别让娃塞嘴里','道路较窄，拍照别长时间逗留'],
+    alert:'两个必须知道的点：<br>① <b>桥世界、红枫岗在北园；前湖／月牙堤要靠南园一侧</b> —— 跨园要买<b>通票 50 元</b>（分开买 15+45=60）。<br>② <b>周一闭园有例外</b>：2023 年红叶季景区曾临时取消周一闭园（至 12/18）方便市民赏叶。你 11/30 正是周一，出发前务必打电话 <b>025-84347036</b> 确认当年是否同样取消。',
+    avoid:['"前湖溢洪沟（南京小九寨）"这类小众野点，公开资料查不到准确位置和是否要票 —— 按现场围挡和指示走，别当成必到的点']
+  },
+  yinyuetai: {
+    name:'音乐台', sub:'半圆形露天音乐台 · 喂鸽子的地方',
+    tags:[{t:'娃最爱',c:'note'},{t:'草坪可坐'},{t:'声学设计'}],
+    feat:'中山陵的纪念建筑之一，半圆形像一把打开的扇子：圆心是舞台，台后 16m 宽、11m 高的弧形照壁靠声学反射把声音散开，不用扩音。台前是半径 50m 的半圆形大草坪，放射状小路分成 12 块扇形。最治愈的是成群和平鸽 —— 不怕人，可以买饲料喂。',
+    info:[['门票','10 元（含在钟山联票 100 元里）'],['开放','6:30–18:00（17:30 停止售票）'],
+      ['闭馆','无'],['建议时长','1 小时'],['推车','好推'],['位置','中山陵博爱广场东南']],
+    route:['这里没有"参观路线"，玩法就是坐下来：买饲料，让娃喂鸽子，看鸽群在蓝天、绿树、白墙之间盘旋',
+      '草坪可以坐，雨后草坪排水好、不积水（设计时有考虑）',
+      '顺路可看流徽榭（三面临水的水榭，中山陵到灵谷的路上）',
+      '南京森林音乐会、钟山假日音乐会常在这里办'],
+    kid:['这是全天情绪最高点 —— 多带面包屑／买饲料',
+      '别让娃跑进鸽群正中间（会惊鸟也会被撞）',
+      '17:10 天黑，16:30 后光线骤降，别安排太晚'],
+    avoid:['这里没有室内空间，中大雨直接砍掉','有人推销"拍照服务"，按需拒绝即可']
+  },
+  zhongshanling: {
+    name:'中山陵', sub:'392 级台阶 · 平面呈"自由钟"形',
+    tags:[{t:'必须预约',c:'warn'},{t:'墓室仅周二至周五',c:'warn'},{t:'周三可进墓室',c:'note'}],
+    feat:'孙中山先生陵寝，平面呈"自由钟"形。从博爱坊到祭堂水平 700 米、升高 70 米，392 级石阶分 10 段带 10 个平台 —— 台阶数按当时全国人口设计（每一千万人一级）。最妙的是视觉手法：从下往上仰望只见台阶不见平台，从祭堂平台俯瞰只见平台不见台阶，俗称"步步高升、一马平川"。',
+    info:[['门票','免费，但必须实名预约 —— 没有售票窗口、不接受现场入园'],
+      ['预约','每日 16:00 放票，可预约未来 7 天；旺季很快抢空'],
+      ['开放','8:30–17:00（"天下为公"陵门以上区域 16:00 停止入园）'],
+      ['闭馆','周一整个陵寝闭馆维护（法定节假日、孙中山诞辰／逝世纪念日除外）'],
+      ['墓室','<b>仅周二至周五开放</b> —— 周六、周日、周一都进不去'],
+      ['建议时长','2–3 小时'],['推车','❌ 392 级台阶、景区内没有电梯，轮椅不建议'],
+      ['交通','2 号线下马坊站 2 号口步行约 5 分钟（比苜蓿园站近）']],
+    route:['博爱坊 → 墓道 → 陵门（"天下为公"）→ 碑亭',
+      '392 级台阶，分 10 段 —— 每段之间的平台就是给你歇的',
+      '祭堂：大理石坐像，壁上刻《建国大纲》全文（<b>堂内禁止拍照</b>）',
+      '墓室（仅周二至周五）',
+      '8:30 开园就到，10 点以后人多到建筑效果完全消失',
+      '两张最出片的：祭堂平台回望（台阶坠入林海）、从碑亭仰拍台阶'],
+    kid:['392 级上行只是一半，景区各点之间还要走好几公里，穿正经鞋',
+      '登阶前在博爱坊一带先上厕所，上面选择少',
+      '想带推车要有心理准备：官方明确"景区内没有电梯"，必要时一人抱娃走台阶、一人推空车绕行'],
+    alert:'你 12/2 是<b>周三 → 墓室开放</b> ✅，这是这趟里唯一能进墓室的窗口，值得为它早到。预约按 7 天前 16:00 放票，也就是 <b>11/25 16:00</b>。',
+    avoid:['免费但没有"花钱兜底"的选项 —— 名额没了，这一天就没了',
+      '观光车单次 10 元、当日不限次 30 元；31 平方公里的景区，和明孝陵排在同一天要买不限次']
+  },
+  laomendong: {
+    name:'老门东', sub:'老城南民居街巷 · 本地人真去吃饭的地方',
+    tags:[{t:'免费'},{t:'比夫子庙好吃',c:'note'},{t:'夜市氛围'}],
+    feat:'老城南传统民居街巷，商业化比夫子庙淡得多。青砖小瓦、石板路、红灯笼，晚上比白天更有氛围。关键价值：它是"夫子庙吃饭贵"的解药 —— 步行 10 分钟，同样的菜便宜约一半。',
+    info:[['门票','免费、全天开放'],['闭馆','无'],['建议时长','1.5–2 小时'],
+      ['推车','石板路颠，伞车比高景观车好推'],['交通','地铁 3 号线武定门站步行约 10 分钟；从夫子庙走过来不到 2 公里']],
+    route:['入口"老门东"牌坊 —— 最经典的合影点',
+      '巷子里人少的青石板路，拍灯光下的路面最治愈',
+      '城墙边能拍出历史的厚重感',
+      '先锋书店老门东店，文艺风、适合避风歇脚',
+      '必吃：陆氏梅花糕、蒋有记（总店）牛肉锅贴 + 牛肉汤、小郑酥烧饼、尹氏汤包'],
+    kid:['17:10 天黑，带娃别在巷子里耗太久','人挤，防走失手环必戴','咸亨饭店 / 小吊梨汤适合坐下来吃正餐'],
+    avoid:['别在主街那些"南京特产"招牌的摊子上买伴手礼，去老店']
+  },
+  fuzimiao: {
+    name:'夫子庙 · 秦淮河画舫', sub:'十里秦淮的灯火河岸',
+    tags:[{t:'街区免费'},{t:'约 18:30 亮灯',c:'cut'},{t:'吃饭溢价最高',c:'warn'}],
+    feat:'五百年的科举街区（隔壁江南贡院是全国最大的科举考场，号舍逾两万间）。士子带来钱、钱带来河房，于是这条河成了中国文学里被写得最多的一段水。街区本身是免费的，约 18:30 亮灯时才真正活过来。',
+    info:[['免费部分','街巷、河岸、乌衣巷、天下文枢牌坊 —— 免费、全天开放、无需预约'],
+      ['收费','大成殿约 30 元；中国科举博物馆约 50 元（与大成殿联票约 70）；瞻园约 40 元'],
+      ['画舫','日游约 80 元、夜游约 100–120 元，航程约 40 分钟；1.2m 以下儿童通常免票，画舫不享学生／老人优惠'],
+      ['末班','约 21:30，冬季更早'],['建议时长','2–3 小时'],['交通','地铁 3 号线夫子庙站 2/3 号口步行约 3 分钟']],
+    route:['16:00–17:30 到 —— 先看关得早的收费馆（约 21:00 关）',
+      '18:30 前后上文德桥等亮灯（19:00 灯光最全）',
+      '坐夜游画舫：<b>东线首选</b>（白鹭洲、七彩水街、东水关），约 40 分钟',
+      '上岸去大石坝街或老门东觅食',
+      '免费机位：文德桥中央对称构图、得月台俯拍、东园桥（人少，适合拍画舫穿桥）',
+      '乌衣巷（王导谢安纪念馆、乌衣井）就在江南贡院旁边'],
+    kid:['画舫登船尽量抢船头／靠窗，中间座位看不到河景',
+      '节假日排队可能 30–60 分钟；21:00 后灯还亮、人已散',
+      '灯会期间真能挤到摩肩接踵，包背在身前'],
+    avoid:['<b>这里是南京餐饮溢价最高的地方</b> —— 主街按"不会再来"定价。看灯在这儿，吃饭去老门东',
+      '船票只在泮池码头窗口或官方小程序买；街上兜售船票和"内部快速通道"的一概不理',
+      '节假日 14:00–22:00 核心区可能要线上免费预约（以当期公告为准）']
+  },
+  qixiashan: {
+    name:'栖霞山', sub:'金陵第一明秀山 · 中国四大赏枫胜地',
+    tags:[{t:'红枫节 80 元'},{t:'正当季',c:'note'},{t:'台阶多',c:'warn'}],
+    feat:'"一座栖霞山，半部金陵史"。和别处赏枫最大的不同是人文感：南朝古刹栖霞寺、舍利塔、千佛岩石窟造像（中国最东部的"敦煌遗迹"，开凿于南朝）和满山古枫叠在一起。2026 年第一次有地铁直达（6 号线，9 月底开通）。',
+    info:[['门票','红枫节 80 元；优惠票 40 元（学生、60–69 岁）；1.4m 以下儿童 / 70 岁以上免票 —— <b>但免票的娃也要提前约免费票</b>'],
+      ['开放','红枫节 7:00–17:30；栖霞古寺 8:00–16:00'],['闭馆','无'],
+      ['预约','红枫节期间实名预约，建议提前 1–3 天在官方公众号「栖霞山风景区」办理，周末限流'],
+      ['建议时长','3–4 小时（带娃 2–3 小时）'],['推车','⚠️ 台阶多，不是全程通行方案'],
+      ['交通','地铁 6 号线栖霞山站，出站步行 500–700 米到西门'],
+      ['服务','西门游客服务中心可免费借婴儿车、免费寄存行李']],
+    route:['带娃松弛版（2–3 小时）：西门 → <b>明镜湖</b>（进门 5 分钟就到，湖面倒影最容易拍）',
+      '<b>栖霞古寺</b> —— 银杏黄 + 红墙，留 40 分钟',
+      '<b>千佛岩／舍利塔</b> —— 台阶较陡，看一眼就够，别深入',
+      '<b>红叶谷</b> —— 全山红枫最密集，步道平缓，留 45 分钟',
+      '<b>枫林湖</b> —— 湖边有长椅，歇脚 20 分钟',
+      '坐观光车下山（上行单程 20 元、分段 10 元/段）',
+      '完整环线 6–8 公里、台阶多，不适合 3 岁；山顶始皇临江处看长江留给下次'],
+    kid:['山里风大，比市区冷，防风外套必备',
+      '山上餐饮少且贵，自备水和小零食',
+      '厕所排队严重 —— 入园后在西门附近先解决，再往深处走',
+      '栈道上有潮湿落叶时慢走；尽量 9 点前入园，红叶季工作日人也不少'],
+    alert:'景区 11/13 官方叶况：低坡还以绿为主，明镜湖周边鸡爪槭<b>半绿半红</b>，龙山上部已橙红深红。官方最佳期是 <b>11 月中旬–12 月上旬</b>，你 12/1 去正在窗口内。红叶受大风和降雨影响大，出发前看景区"红叶指数"公告。',
+    avoid:['<b>千万别开车去</b>：红叶季周末栖霞大道 6 点就可能堵，西门停车场 8–11 点基本满位',
+      '傍晚极难打车、公交挤爆 —— <b>地铁返程最稳</b>，建议 17:00 前离园',
+      '山脚素面 20 元出头，下山那碗最舒坦']
+  },
+  zongtongfu: {
+    name:'南京总统府', sub:'雨天备选 · 一座总统府，半部近代史',
+    tags:[{t:'雨天首选',c:'note'},{t:'35 元'},{t:'周一闭馆'}],
+    feat:'600 年里叠着明初归德侯府、清代两江总督署、太平天国天朝宫殿、1912 年临时大总统府、民国国民政府。中西建筑混在一个院落里：中轴是办公与仪典（大堂"天下为公"→ 二堂 → 子超楼），西花园煦园是典型江南园林（石舫"不系舟"），东区是行政院与太平天国遗迹。',
+    info:[['门票','35 元（现场 40）'],['开放','10/15–次年 2 月底 8:30–17:00（16:00 停止入馆）'],
+      ['闭馆','周一（法定节假日除外）'],['优惠','18 周岁以下免票（每名家长限带 2 名）'],
+      ['建议时长','2–3 小时'],['推车','✅ 游客中心可免费租童车（押金 200 元）'],
+      ['交通','地铁 2/3 号线大行宫站 5 号口，步行约 200 米']],
+    route:['中轴：大堂（"天下为公"匾）→ 二堂 → 子超楼（蒋介石办公室原状陈列）',
+      '东区：行政院、太平天国遗迹、清两江总督署史料展、陶林二公祠、马厩',
+      '西花园：煦园石舫"不系舟" → 孙中山临时大总统办公室',
+      '西门出园就是 1912 街区，可吃鸭血粉丝、盐水鸭、鸭油酥烧饼',
+      '讲解：售票处有中文讲解，10 人以下 100 元／约 1 小时'],
+    kid:['园内树多水多，夏秋注意防蚊；户外段长，晴天带帽伞',
+      '景区有 10 个卫生间，按导览标示找就行',
+      '中轴在假期容易拥堵，能错峰就错峰，或一开门（8:30）就进'],
+    alert:'为什么把它放在 Day4 的备选：你 12/1 是<b>周二 → 总统府开放</b>，地铁直达、有童车可租。而原方案的"南京科技馆"周二闭馆，用不了。'
+  },
+  kejiguan: {
+    name:'南京科技馆', sub:'备选 · 注意闭馆日，原方案这天用不了',
+    tags:[{t:'周一、周二闭馆',c:'warn'},{t:'免费'},{t:'室内雨天友好'}],
+    feat:'免费科普场馆。主场馆四层常设展厅：公共安全教育馆、基础科学与少儿科普体验区、地球万象与智慧主人、动漫体验馆；另有 IMAX 球幕、4D、3D、5D 影院。园区还有湿地公园和后山。互动展项占比高，3 岁娃在"少儿科普体验区"能玩很久。',
+    info:[['门票','免费（需公众号实名预约）'],['开放','周三至周日 9:00–17:00（9:00–16:00 入园）'],
+      ['闭馆','<b>周一、周二</b>'],['建议时长','3–4 小时'],['推车','好推'],
+      ['交通','地铁 1 号线花神庙站']],
+    route:['负一层：公共安全教育馆、消防科普教育馆',
+      '一层：基础科学 + 少儿科普体验区（3 岁娃主场）',
+      '二层：能源与环境、机器人世界、信息与技术',
+      '三层：南京市中小学科技创新中心',
+      '影院（IMAX 球幕 / 4D / 3D / 5D）另需购票'],
+    kid:['室内为主，雨天最友好','园区有湿地公园和后山，可以出去透气'],
+    alert:'<b>你行程 Day4 是 12/1 周二 → 科技馆闭馆</b>，原方案这条是死的。要用它只能安排到周三至周日（比如把 Day5 上午换成科技馆，但那样中山陵和墓室就没了）。'
+  }
+};
+
+/* =====================================================================
+   图标（Phosphor 风格内联 SVG，避免 emoji 当 UI 图标）
+   ===================================================================== */
+const P = {
+  calendar:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M8 3v4M16 3v4"/><path d="M8.6 14.4l2.3 2.3 4.6-4.6"/>',
+  pin:'<path d="M12 21s7-5.6 7-11a7 7 0 10-14 0c0 5.4 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/>',
+  list:'<path d="M4 6.6l1.7 1.7 3-3"/><path d="M4 13l1.7 1.7 3-3"/><path d="M4 19.4l1.7 1.7 3-3"/><path d="M12 7h9M12 13.4h9M12 19.8h9"/>',
+  dots:'<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>',
+  left:'<path d="M15 5l-6.5 7 6.5 7"/>',
+  right:'<path d="M9 5l6.5 7L9 19"/>',
+  rain:'<path d="M7.5 15a4 4 0 010-8 5.6 5.6 0 0110.6 1.6A3.6 3.6 0 0117.5 15H7.5z"/><path d="M8.5 18.4l-1 2M12 18.4l-1 2M15.5 18.4l-1 2"/>',
+  dl:'<path d="M12 4v11"/><path d="M7.5 10.5L12 15l4.5-4.5"/><path d="M5 19.5h14"/>',
+  copy:'<rect x="9" y="9" width="11.5" height="11.5" rx="2.5"/><path d="M15 5.6A2.6 2.6 0 0012.4 3H5.6A2.6 2.6 0 003 5.6v6.8A2.6 2.6 0 005.6 15"/>',
+  x:'<path d="M6 6l12 12M18 6L6 18"/>',
+  check:'<path d="M5 12.6l4.6 4.6L19 7.4"/>',
+  clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  train:'<rect x="5" y="3.5" width="14" height="13" rx="3"/><path d="M8 16.5l-1.5 4M16 16.5l1.5 4M7 20.5h10"/><path d="M8.5 8h7"/>',
+  bag:'<rect x="4" y="7.5" width="16" height="12.5" rx="3"/><path d="M9 7.5V6a3 3 0 016 0v1.5"/>',
+  food:'<path d="M7 3v8a2.5 2.5 0 005 0V3"/><path d="M9.5 11v10"/><path d="M17 3c-1.6 1.4-2.4 3-2.4 5s.8 3 2.4 3v10"/>',
+  shirt:'<path d="M9 3l3 2 3-2 4 3-2 3-1.5-1v13h-7V8L7 9 5 6z"/>',
+  alert:'<path d="M12 4.5l8.5 15h-17z"/><path d="M12 10v4.5M12 17.2v.1"/>',
+  wallet:'<rect x="3" y="6" width="18" height="13" rx="3"/><path d="M3 10.5h18"/><circle cx="16.5" cy="14.5" r="1.2"/>',
+  book:'<path d="M5 4.5h11a2.5 2.5 0 012.5 2.5v13H7.5A2.5 2.5 0 015 17.5z"/><path d="M5 17.5A2.5 2.5 0 017.5 15h11"/>',
+  share:'<circle cx="17.5" cy="6" r="2.6"/><circle cx="6.5" cy="12" r="2.6"/><circle cx="17.5" cy="18" r="2.6"/><path d="M8.9 10.7l6.2-3.4M8.9 13.3l6.2 3.4"/>',
+  info:'<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.1"/>',
+  chev:'<path d="M9 5.5l6.5 6.5L9 18.5"/>',
+  reset:'<path d="M4.5 10.5A8 8 0 1112 20a8 8 0 01-6.6-3.5"/><path d="M4 4.5v6h6"/>'
+};
+function ic(name, cls){
+  return `<svg class="ic${cls?' '+cls:''}" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]||''}</svg>`;
+}
+/* Tab 栏图标用实心，视觉重心更稳 */
+function icFill(name){
+  return `<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+    stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${P[name]||''}</svg>`;
+}
+document.querySelectorAll('#tabbar [data-ic]').forEach(el => { el.outerHTML = icFill(el.dataset.ic); });
+document.getElementById('btnPrev').innerHTML = ic('left');
+document.getElementById('btnNext').innerHTML = ic('right');
+document.querySelectorAll('.x-close').forEach(b => { b.innerHTML = ic('x'); });
+/* 全屏页面的返回按钮 */
+document.querySelectorAll('.pg-back').forEach(b => {
+  b.innerHTML = ic('left');
+  b.setAttribute('title', '返回');
+});
+
+/* =====================================================================
+   勾选状态
+   ===================================================================== */
+const K = {
+  row: (d,i) => `${d}|r|${i}`,
+  cd:  i => `cd|${i}`,
+  bk:  i => `bk|${i}`,
+  pk:  (g,i) => `pk|${g}|${i}`,
+  me:  i => `me|${i}`,
+  cl:  i => `cl|${i}`,
+  out: i => `tr-out|${i}`,
+  back:i => `tr-back|${i}`,
+  stayWhy: i => `stay-why|${i}`,
+  stayAsk: i => `stay-ask|${i}`,
+  rain: d => `rain|${d}`
+};
+let store = {};
+function loadStore(){ try{ store = JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }catch(e){ store = {}; } }
+function saveStore(){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(store)); }catch(e){} }
+
+function allKeys(){
+  const k = [];
+  DAYS.forEach(d => d.rows.forEach((r,i) => k.push(K.row(d.id,i))));
+  COUNTDOWN.forEach((r,i) => k.push(K.cd(i)));
+  BOOKING.forEach((r,i) => k.push(K.bk(i)));
+  PACKING.forEach((g,gi) => g.items.forEach((it,i) => k.push(K.pk(gi,i))));
+  MUST_EAT.forEach((t,i) => k.push(K.me(i)));
+  CLOTHES_CHECK.forEach((t,i) => k.push(K.cl(i)));
+  TRAIN_OUT.forEach((r,i) => k.push(K.out(i)));
+  TRAIN_BACK.forEach((r,i) => k.push(K.back(i)));
+  STAY_WHY.forEach((t,i) => k.push(K.stayWhy(i)));
+  STAY_ASK.forEach((t,i) => k.push(K.stayAsk(i)));
+  return k;
+}
+const ALL_KEYS = allKeys();
+function progress(){
+  const done = ALL_KEYS.filter(k => store[k]).length;
+  return { done, total: ALL_KEYS.length };
+}
+function paintProgress(){
+  const p = progress();
+  const pct = p.total ? Math.round(p.done / p.total * 100) : 0;
+  document.getElementById('sbNum').textContent = `${p.done}/${p.total}`;
+  document.getElementById('sbBar').style.width = pct + '%';
+  DAYS.forEach(d => {
+    const el = document.querySelector(`[data-cprog="${d.id}"]`);
+    if (!el) return;
+    const n = d.rows.filter((r,i) => store[K.row(d.id,i)]).length;
+    el.innerHTML = `<b>${n} / ${d.rows.length}</b><span>已完成</span>`;
+  });
+  const lb = document.querySelector('[data-pbar]');
+  if (lb) {
+    const on = listKeys().filter(k => store[k]).length;
+    lb.style.width = (listKeys().length ? Math.round(on / listKeys().length * 100) : 0) + '%';
+  }
+  document.querySelectorAll('label.ck[data-k]').forEach(l => l.classList.toggle('on', !!store[l.dataset.k]));
+  document.querySelectorAll('.row[data-k]').forEach(r => r.classList.toggle('done', !!store[r.dataset.k]));
+}
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.matches('input[data-k]')) { store[el.dataset.k] = el.checked; saveStore(); paintProgress(); }
+});
+
+/* =====================================================================
+   SVG 线路示意图
+   ===================================================================== */
+function schematic(routes, w, h, fs){
+  fs = fs || 13;
+  const entries = (routes||[]).map(r => ({
+    color: r.color, name: r.name,
+    pts: [...new Set(r.points)].map(n => ({ n, p: POI[n] })).filter(x => x.p)
+  })).filter(r => r.pts.length);
+  if (!entries.length) return '<div style="padding:18px;font-size:13px;color:#7A726A">无点位数据</div>';
+
+  const all = entries.flatMap(r => r.pts);
+  const lat = all.map(x => x.p[0]), lng = all.map(x => x.p[1]);
+  let a = Math.min(...lat), b = Math.max(...lat), c = Math.min(...lng), e2 = Math.max(...lng);
+  if (b - a < 1e-4) { a -= 5e-4; b += 5e-4; }
+  if (e2 - c < 1e-4) { c -= 5e-4; e2 += 5e-4; }
+
+  const single = entries.length === 1;
+  const cols = 3;
+  const legendRows = single ? 0 : Math.ceil(entries.length / cols);
+  const cos = Math.cos((a + b) / 2 * Math.PI / 180);
+  const spanX = (e2 - c) * cos, spanY = b - a;
+  const pad = w * .055;
+  const padR = single ? fs * 11.5 : w * .06;
+  const padB = h * .13 + legendRows * fs * 1.5;
+  const s = Math.min((w - pad - padR) / spanX, (h - pad - padB) / spanY);
+  const offX = pad + ((w - pad - padR) - spanX * s) / 2;
+  const offY = pad + ((h - pad - padB) - spanY * s) / 2;
+  const XY = p => [offX + (p[1] - c) * cos * s, offY + (b - p[0]) * s];
+
+  const placed = [];
+  const body = entries.map(en => {
+    const xy = en.pts.map(x => XY(x.p));
+    const path = xy.map((q, i) => `${i ? 'L' : 'M'}${q[0].toFixed(1)},${q[1].toFixed(1)}`).join(' ');
+    const marks = xy.map((q, i) => {
+      const dot = `<circle cx="${q[0].toFixed(1)}" cy="${q[1].toFixed(1)}" r="${(single?fs*.52:fs*.4).toFixed(1)}"
+        fill="${single?'#FFFDF9':en.color}" stroke="${single?'#C2452D':'#FFFDF9'}" stroke-width="${single?fs*.22:fs*.11}"/>`;
+      if (!single) return dot;
+      const lx = q[0] + fs * .85;
+      let ly = q[1] + fs * .32, g = 0;
+      while (placed.some(p => Math.abs(p.x - lx) < fs * 15 && Math.abs(p.y - ly) < fs * 1.2) && g++ < 14) ly += fs * 1.2;
+      ly = Math.max(fs * 1.1, Math.min(h - padB - fs * .4, ly));
+      placed.push({ x: lx, y: ly });
+      return dot
+        + `<line x1="${(q[0] + fs * .32).toFixed(1)}" y1="${q[1].toFixed(1)}" x2="${lx.toFixed(1)}" y2="${(ly - fs * .3).toFixed(1)}" stroke="#C8BDAE" stroke-width="${(fs*.08).toFixed(2)}"/>`
+        + `<text x="${lx.toFixed(1)}" y="${ly.toFixed(1)}" font-size="${fs}" font-family="system-ui,PingFang SC,Microsoft YaHei" fill="#3B342C" style="paint-order:stroke;stroke:#FFFDF9;stroke-width:${(fs*.28).toFixed(1)}px">${i+1} ${en.pts[i].n}</text>`;
+    }).join('');
+    return `<path d="${path}" fill="none" stroke="${en.color}" stroke-width="${(single?fs*.2:fs*.16).toFixed(2)}"
+      stroke-dasharray="${single?'7 5':'5 5'}" stroke-linecap="round" opacity="${single?'.75':'.8'}"/>${marks}`;
+  }).join('');
+
+  const legend = single ? '' : entries.map((en, i) => {
+    const col = i % cols, row = Math.floor(i / cols);
+    const yy = h - fs * 1.2 - (legendRows - 1 - row) * fs * 1.5;
+    return `<circle cx="${pad + col * (w / cols) - fs * 2}" cy="${(yy - fs * .3).toFixed(1)}" r="${(fs*.4).toFixed(1)}" fill="${en.color}"/>
+      <text x="${(pad + col * (w / cols) - fs * .9).toFixed(1)}" y="${yy.toFixed(1)}" font-size="${(fs*.92).toFixed(1)}"
+        font-family="system-ui,PingFang SC,Microsoft YaHei" fill="#6B6259">${en.name}</text>`;
+  }).join('');
+
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" preserveAspectRatio="xMidYMid meet"
+    xmlns="http://www.w3.org/2000/svg" style="display:block" role="img" aria-label="当日线路示意图">
+    <rect width="${w}" height="${h}" fill="#F7F3EA"/>${body}${legend}
+    <text x="${(w*.02).toFixed(1)}" y="${h - fs*.25}" font-size="${(fs*.78).toFixed(1)}" font-family="system-ui" fill="#C0B8AD">线路示意图（非真实底图）</text>
+  </svg>`;
+}
+function dayRoutes(d){ return [{ points: d.route, color: d.hex, name: `${d.no} ${d.date}` }]; }
+function allRoutes(){ return DAYS.map(d => ({ points: d.route, color: d.hex, name: `${d.no} ${d.date}` })); }
+
+/* =====================================================================
+   行程 Tab：卡片
+   ===================================================================== */
+let active = 0, pos = 0, dragFrac = 0, animating = false;
+const deckEls = [];
+
+function todayIndex(){
+  const t = new Date(); t.setHours(0,0,0,0);
+  const s = new Date(TRIP_START + 'T00:00:00'), e = new Date(TRIP_END + 'T00:00:00');
+  if (t < s) return 0;
+  if (t > e) return DAYS.length - 1;
+  const diff = Math.round((t - s) / 86400000);
+  return Math.max(0, Math.min(DAYS.length - 1, diff));
+}
+function renderStatus(){
+  const t = new Date(); t.setHours(0,0,0,0);
+  const s = new Date(TRIP_START + 'T00:00:00'), e = new Date(TRIP_END + 'T00:00:00');
+  const sub = document.getElementById('sbSub');
+  if (t < s) {
+    const n = Math.round((s - t) / 86400000);
+    sub.textContent = `还有 ${n} 天出发 · 11/28–12/2`
+      + (n <= 2 ? ' · 该收拾行李了' : '');
+  } else if (t > e) {
+    sub.textContent = '行程已完成 · 11/28–12/2';
+  } else {
+    sub.textContent = `今天是 ${DAYS[todayIndex()].no} · ${DAYS[todayIndex()].date}`;
+  }
+}
+
+function cardHTML(d){
+  return `<div class="ch-top">
+      <div>
+        <div class="ch-no">${d.no}</div>
+        <div class="ch-date">${d.date}<small>${d.week} · ${d.weather} ${d.temp}</small></div>
+        <div class="ch-theme">${d.theme}　|　${d.lead}</div>
+      </div>
+      <div class="ch-prog" data-cprog="${d.id}"><b>0 / ${d.rows.length}</b><span>已完成</span></div>
+    </div>
+    <div class="tagbar">${(d.tags||[]).map(t=>`<span class="tag ${t.c}">${t.t}</span>`).join('')}
+      <button class="rain-btn" data-rain="${d.id}" aria-pressed="${!!store[K.rain(d.id)]}">
+        ${ic('rain')}${store[K.rain(d.id)] ? '雨天版已开' : '雨天版'}
+      </button>
+    </div>
+    ${store[K.rain(d.id)] ? `<div class="rain-note">${ic('info')}<span>${d.rainNote}</span></div>` : ''}`;
+}
+function cardBody(d){
+  return `${d.rows.map((r,i)=>{
+      const k = K.row(d.id,i), on = !!store[k], alt = r[4], rain = !!store[K.rain(d.id)];
+      const gid = ROW_GUIDE[`${d.id}|${i}`];
+      const cid = 'ck-' + k.replace(/[^a-z0-9]/gi,'_');
+      return `<div class="row${on?' done':''}${alt&&rain?' rain-out':''}" data-k="${k}">
+        <input type="checkbox" id="${cid}" data-k="${k}" ${on?'checked':''}>
+        <label class="hit" for="${cid}" aria-label="${r[0]} ${String(r[1]).replace(/<[^>]+>/g,'')}"></label>
+        <span class="tick">${ic('check')}</span>
+        <span class="r-main">
+          <span class="r-line"><span class="r-time">${r[0]}</span><span class="r-name">${r[1]}</span></span>
+          ${(r[2] && r[2] !== '—') || (r[3] && r[3] !== '—')
+            ? `<span class="r-meta">${[
+                r[2] && r[2] !== '—' ? `<span class="r-tr">${r[2]}</span>` : '',
+                r[3] && r[3] !== '—' ? `<span class="r-tip">${r[3]}</span>` : ''
+              ].filter(Boolean).join('<span class="dotsep">·</span>')}</span>` : ''}
+          ${alt && rain ? `<span class="r-alt">${alt}</span>` : ''}
+        </span>
+        ${gid ? `<button class="row-guide" data-guide="${gid}" aria-label="查看 ${GUIDES[gid].name} 攻略">攻略${ic('chev')}</button>` : ''}
+      </div>`;
+    }).join('')}
+    <div class="blk">
+      <h4>当天路线</h4>
+      <button class="routemap" data-openmap="${d.id}" aria-label="全屏查看 ${d.no} 的路线图">
+        ${schematic(dayRoutes(d), 400, 200, 13)}
+        <span class="rm-open">${ic('pin')}全屏查看</span>
+      </button>
+    </div>
+    ${d.notice ? `<div class="blk"><div class="note ${d.noticeCls||''}">${d.notice}</div></div>` : ''}
+    ${(d.notes||[]).map(n => `<div class="blk"><h4>${n.h}</h4>${n.list.map(t=>`<div class="note">${t}</div>`).join('')}</div>`).join('')}
+    <div class="blk"><div class="note cut"><b>可砍项</b>：${d.cut}</div></div>
+    <div class="card-act">
+      <button class="btn sm" data-export="${d.id}">${ic('dl')}导出这天图</button>
+      <button class="btn sm" data-textday="${d.id}">${ic('copy')}复制清单</button>
+    </div>`;
+}
+
+function renderDeck(){
+  const wrap = document.getElementById('deckWrap');
+  wrap.innerHTML = DAYS.map((d,i) => `<article class="card" data-i="${i}" style="--c:${d.hex}" role="group"
+      aria-roledescription="卡片" aria-label="${d.no} ${d.date} ${d.week}">
+      <div class="card-head" data-head="${d.id}"></div>
+      <div class="card-body" data-body="${d.id}"></div>
+    </article>`).join('');
+  DAYS.forEach((d,i) => {
+    wrap.querySelector(`[data-head="${d.id}"]`).innerHTML = cardHTML(d,i);
+    wrap.querySelector(`[data-body="${d.id}"]`).innerHTML = cardBody(d);
+    deckEls[i] = wrap.querySelector(`[data-i="${i}"]`);
+  });
+  document.getElementById('dots').innerHTML = DAYS.map((d,i) =>
+    `<button class="dot" role="tab" data-dot="${i}" aria-current="${i===active}" aria-label="${d.no} ${d.date}"><i></i></button>`).join('');
+  document.getElementById('dots').style.gap = '0';
+  bindBodyEvents();
+  layout(false);
+}
+function refreshCard(id){
+  const i = DAYS.findIndex(d => d.id === id);
+  const d = DAYS[i];
+  deckEls[i].querySelector('.card-head').innerHTML = cardHTML(d,i);
+  deckEls[i].querySelector('.card-body').innerHTML = cardBody(d);
+  bindBodyEvents();
+  paintProgress();
+}
+
+/* 卡片布局：当前卡跟手并旋转；相邻卡从侧面探出 */
+function layout(animate){
+  const W = document.getElementById('deckWrap').clientWidth || 360;
+  const PEEK = 20, S0 = 0.97, p = Math.min(1, Math.abs(dragFrac));
+  const dir = dragFrac < 0 ? 1 : dragFrac > 0 ? -1 : 1;
+  const incoming = active + dir;
+  const t = animate ? 'transform .32s var(--ease), opacity .32s var(--ease)' : 'none';
+  deckEls.forEach((el, i) => {
+    el.style.transition = t;
+    const rel = i - active;
+    if (rel === 0) {
+      el.className = 'card active';
+      el.style.transform = `translate3d(${(dragFrac*W).toFixed(1)}px,0,0) rotate(${(dragFrac*6).toFixed(2)}deg)`;
+      el.style.opacity = 1;
+      el.style.zIndex = 3;
+      el.style.boxShadow = Math.abs(dragFrac) > .02 ? 'var(--sh-drag)' : 'var(--sh-card)';
+      el.style.pointerEvents = 'auto';
+    } else if (i === incoming && Math.abs(rel) <= 1.2) {
+      const x = dir * PEEK * (1 - p);
+      el.className = 'card';
+      el.style.transform = `translate3d(${x.toFixed(1)}px,0,0) scale(${(S0 + (1-S0)*p).toFixed(4)}) rotate(0deg)`;
+      el.style.opacity = 1;
+      el.style.zIndex = 2;
+      el.style.pointerEvents = 'none';
+    } else {
+      el.className = 'card';
+      el.style.transform = `translate3d(${(dir*PEEK).toFixed(1)}px,0,0) scale(${S0})`;
+      el.style.opacity = 0;
+      el.style.zIndex = 1;
+      el.style.pointerEvents = 'none';
+    }
+  });
+  document.querySelectorAll('[data-dot]').forEach(b =>
+    b.setAttribute('aria-current', String(+b.dataset.dot === active)));
+  document.getElementById('btnPrev').disabled = active === 0;
+  document.getElementById('btnNext').disabled = active === DAYS.length - 1;
+}
+function goTo(i, animate){
+  if (i < 0 || i >= DAYS.length || i === active) return;
+  slideTo(i, animate);
+}
+/* 翻页动画：旧卡沿「拖动方向」滑出，新卡从侧后方升到正中 */
+function slideTo(target, animate){
+  const dir = target > active ? 1 : -1;
+  if (!animate){ active = target; dragFrac = 0; layout(false); return; }
+  animating = true;
+  dragFrac = -dir;                             // 旧卡滑到 -dir * 屏宽
+  layout(true);
+  setTimeout(() => {
+    animating = false; active = target; dragFrac = 0;
+    layout(false); announce();
+  }, 330);
+}
+
+/* ---------- 手势 ---------- */
+(function gesture(){
+  const wrap = document.getElementById('deckWrap');
+  let sx = 0, sy = 0, st = 0, axis = null, id = null;
+  const W = () => wrap.clientWidth || 360;
+
+  function down(x, y, t, target){
+    if (animating) return;
+    const r = wrap.getBoundingClientRect();
+    if (x - r.left < 24) return;            // 左侧 24px 保护区：保住 iOS 左缘返回
+    id = 1; sx = x; sy = y; st = t; axis = null; dragFrac = 0;
+  }
+  function move(x, y, t){
+    if (!id || animating) return;
+    const dx = x - sx, dy = y - sy;
+    if (!axis){
+      if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy) * 1.2) axis = 'x';
+      else if (Math.abs(dy) > 8) { axis = 'y'; id = null; return; }
+      else return;
+    }
+    if (axis !== 'x') return;
+    let f = dx / W();
+    // 硬边：首尾橡皮筋
+    if ((active === 0 && f > 0) || (active === DAYS.length-1 && f < 0)) f *= 0.35;
+    dragFrac = Math.max(-1.1, Math.min(1.1, f));
+    layout(false);
+  }
+  function up(t){
+    if (!id || animating) return;
+    const dur = st ? (t - st) : 999, v = Math.abs(dragFrac) * W() / Math.max(1, dur);
+    const commit = Math.abs(dragFrac) > 0.28 || v > 0.5;
+    const dir = dragFrac < 0 ? 1 : -1;        // 拖左 = 下一张
+    id = null;
+    const target = active + dir;
+    if (commit && target >= 0 && target < DAYS.length){
+      slideTo(target);
+    } else {
+      animating = true;
+      dragFrac = 0;                            // 回弹
+      layout(true);
+      setTimeout(() => { animating = false; layout(false); }, 330);
+    }
+  }
+  wrap.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    const t0 = e.touches[0]; down(t0.clientX, t0.clientY, e.timeStamp, e.target);
+  }, { passive:true });
+  wrap.addEventListener('touchmove', e => {
+    if (!id) return;
+    const t0 = e.touches[0]; move(t0.clientX, t0.clientY, e.timeStamp);
+    if (axis === 'x') e.preventDefault();
+  }, { passive:false });
+  wrap.addEventListener('touchend', e => { if (id) up(e.timeStamp); });
+  wrap.addEventListener('touchcancel', e => { if (id) up(e.timeStamp); });
+
+  /* 桌面兜底（鼠标拖拽 + 键盘） */
+  wrap.addEventListener('mousedown', e => { if (e.button === 0) down(e.clientX, e.clientY, e.timeStamp, e.target); });
+  window.addEventListener('mousemove', e => { if (id) move(e.clientX, e.clientY, e.timeStamp); });
+  window.addEventListener('mouseup', e => { if (id) up(e.timeStamp); });
+  document.addEventListener('keydown', e => {
+    if (document.querySelector('.sheet:not([hidden]), .page:not([hidden])')) return;
+    if (e.key === 'ArrowLeft') goTo(active-1, true);
+    if (e.key === 'ArrowRight') goTo(active+1, true);
+  });
+})();
+function announce(){
+  const d = DAYS[active];
+  const t = document.getElementById('toast');
+  t.textContent = `${d.no} · ${d.date} ${d.week} · ${d.theme}`;
+  t.classList.add('on');
+  clearTimeout(announce._t);
+  announce._t = setTimeout(() => t.classList.remove('on'), 1400);
+}
+
+/* =====================================================================
+   卡内事件（勾选 / 雨天 / 展开地图 / 导出）
+   ===================================================================== */
+function bindBodyEvents(){
+  document.querySelectorAll('.row input[data-k]').forEach(inp => {
+    inp.onchange = () => {
+      store[inp.dataset.k] = inp.checked; saveStore();
+      inp.closest('.row').classList.toggle('done', inp.checked);
+      paintProgress();
+    };
+  });
+  document.querySelectorAll('[data-rain]').forEach(b => {
+    b.onclick = () => {
+      const id = b.dataset.rain;
+      const next = !store[K.rain(id)];
+      store[K.rain(id)] = next; saveStore();
+      refreshCard(id);
+      toast(next ? '已切换到雨天版' : '已切回正常行程');
+    };
+  });
+  document.querySelectorAll('[data-export]').forEach(b => { b.onclick = () => exportDay(b.dataset.export); });
+  document.querySelectorAll('[data-textday]').forEach(b => { b.onclick = () => openText(b.dataset.textday); });
+}
+/* 攻略按钮 / 路线图：全局委托，避免行内 label 触发勾选 */
+document.addEventListener('click', e => {
+  const g = e.target.closest('[data-guide]');
+  if (g){ e.preventDefault(); e.stopPropagation(); closePages(); renderGuide(g.dataset.guide); return; }
+  const m = e.target.closest('[data-openmap]');
+  if (m){ e.preventDefault(); e.stopPropagation(); closePages(); renderMapPage(m.dataset.openmap); return; }
+  if (e.target.closest('[data-close-page]')){ closePages(); }
+});
+
+/* =====================================================================
+   地图 Tab
+   ===================================================================== */
+let mapDay = DAYS[todayIndex()].id, mapObj = null, mapLayer = null, fullMapObj = null;
+function inTrip(){
+  const t = new Date(); t.setHours(0,0,0,0);
+  return t >= new Date(TRIP_START+'T00:00:00') && t <= new Date(TRIP_END+'T00:00:00');
+}
+function renderMapChips(){
+  const t = todayIndex(), isToday = inTrip();
+  document.getElementById('mapChips').innerHTML =
+    `<button class="chip" data-md="__today" aria-pressed="${isToday && mapDay===DAYS[t].id}" style="${isToday&&mapDay===DAYS[t].id?'background:#4C6B7A;color:#fff':''}">
+       <span style="width:8px;height:8px;border-radius:50%;background:#4C6B7A;display:inline-block"></span>${isToday?'今天':'出发前'}</button>` +
+    DAYS.map(d => {
+      const sel = mapDay === d.id;
+      return `<button class="chip" data-md="${d.id}" aria-pressed="${sel}" style="${sel?`background:${d.hex};color:#fff`:''}">
+        <span style="width:8px;height:8px;border-radius:50%;background:${sel?'#fff':d.hex};display:inline-block"></span>${d.no.replace('DAY ','D')} ${d.date}</button>`;
+    }).join('');
+  document.querySelectorAll('[data-md]').forEach(b => {
+    if (b.getAttribute('aria-pressed') === 'true') b.style.borderColor = 'transparent';
+  });
+}
+function renderPoiList(d){
+  document.getElementById('poiList').innerHTML = [...new Set(d.route)].map((n,i) => {
+    const p = POI[n];
+    return `<button class="poi" data-poi="${n}">
+      <span class="n" style="background:${d.hex}">${i+1}</span>
+      <span class="t">${n}<small>${p ? p[2] : ''}</small></span>
+      ${ic('chev')}
+    </button>`;
+  }).join('');
+  document.querySelectorAll('[data-poi]').forEach(b => {
+    b.onclick = () => {
+      const name = b.dataset.poi, ll = gcj(POI[name]);
+      if (mapObj && ll){ mapObj.setView(ll, 15, { animate:true }); L.popup().setLatLng(ll).setContent(`<b>${name}</b>`).openOn(mapObj); }
+    };
+  });
+}
+function gcj(p){
+  if (!p) return null;
+  const [lat,lng] = wgs2gcj(p[0],p[1]);
+  return [lat,lng];
+}
+const TILE = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}';
+function drawMap(){
+  const d = DAYS.find(x => x.id === mapDay) || DAYS[0];
+  if (!window.L){
+    document.getElementById('mapBox').innerHTML = schematic(dayRoutes(d), 400, 260, 12);
+    document.getElementById('mapHint').textContent = '地图库未加载，已降级为线路示意图。';
+    renderPoiList(d); return;
+  }
+  if (!mapObj){
+    mapObj = L.map('mapBox', { zoomControl:true, attributionControl:false });
+    L.tileLayer(TILE, { subdomains:'1234', maxZoom:18 }).addTo(mapObj);
+  }
+  if (mapLayer) { mapLayer.remove(); }
+  mapLayer = L.layerGroup().addTo(mapObj);
+  const pts = [];
+  [...new Set(d.route)].forEach((n,i) => {
+    const ll = gcj(POI[n]); if (!ll) return;
+    pts.push(ll);
+    L.marker(ll, { icon: L.divIcon({ className:'', iconSize:[26,26], iconAnchor:[13,13],
+      html:`<div style="width:26px;height:26px;border-radius:50%;background:${d.hex};color:#fff;font:700 12px/26px system-ui;text-align:center;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.35)">${i+1}</div>` })
+    }).addTo(mapLayer).bindPopup(`<b>${n}</b>${POI[n][2]?'<br>'+POI[n][2]:''}`);
+  });
+  L.polyline(d.route.map(n => gcj(POI[n])).filter(Boolean), { color:d.hex, weight:3.5, opacity:.85, dashArray:'6 6' }).addTo(mapLayer);
+  if (pts.length) mapObj.fitBounds(L.latLngBounds(pts).pad(.22));
+  document.getElementById('mapHint').innerHTML =
+    `<b>${d.no} · ${d.date} ${d.week}</b>　${d.theme}<br>${d.traffic}`;
+  renderPoiList(d);
+  setTimeout(() => mapObj.invalidateSize(), 60);
+}
+function renderMapPage(id){
+  const d = DAYS.find(x => x.id === id);
+  document.getElementById('mapTitle').textContent = `${d.no} · ${d.date} ${d.week}`;
+  document.getElementById('mapSub').textContent = `${d.theme}　|　${[...new Set(d.route)].length} 个点位`;
+  show('pageMap');
+  const box = document.getElementById('fullMap');
+  if (fullMapObj) { fullMapObj.remove(); fullMapObj = null; }
+  box.innerHTML = '';
+  if (!window.L){ box.innerHTML = `<div style="padding:14px">${schematic(dayRoutes(d), 400, 320, 13)}</div>`; return; }
+  fullMapObj = L.map('fullMap', { zoomControl:false, attributionControl:false });
+  L.control.zoom({ position:'bottomright' }).addTo(fullMapObj);
+  L.tileLayer(TILE, { subdomains:'1234', maxZoom:18 }).addTo(fullMapObj);
+  const pts = [];
+  [...new Set(d.route)].forEach((n,i) => {
+    const ll = gcj(POI[n]); if (!ll) return;
+    pts.push(ll);
+    L.marker(ll, { icon: L.divIcon({ className:'', iconSize:[28,28], iconAnchor:[14,14],
+      html:`<div style="width:28px;height:28px;border-radius:50%;background:${d.hex};color:#fff;font:700 13px/28px system-ui;text-align:center;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.35)">${i+1}</div>` })
+    }).addTo(fullMapObj).bindPopup(`<b>${n}</b>${POI[n][2]?'<br>'+POI[n][2]:''}`);
+  });
+  L.polyline(d.route.map(n => gcj(POI[n])).filter(Boolean), { color:d.hex, weight:5, opacity:.85, dashArray:'8 8' }).addTo(fullMapObj);
+  setTimeout(() => {
+    fullMapObj.invalidateSize();
+    if (pts.length) fullMapObj.fitBounds(L.latLngBounds(pts).pad(.3));
+  }, 120);
+}
+function closePages(){
+  if (fullMapObj) { fullMapObj.remove(); fullMapObj = null; }
+  document.getElementById('fullMap').innerHTML = '';
+  hide('pageMap'); hide('pageGuide');
+}
+
+/* ---------- 景点攻略页 ---------- */
+function renderGuide(gid){
+  const g = GUIDES[gid];
+  if (!g) return;
+  document.getElementById('guideTitle').textContent = g.name;
+  document.getElementById('guideSub').textContent = g.sub || '';
+  document.getElementById('guideBody').innerHTML = `
+    <div class="gcard">
+      <div class="gtags">${(g.tags||[]).map(t => `<span class="tag ${t.c||''}">${t.t}</span>`).join('')}</div>
+      <p class="gfeat">${g.feat}</p>
+    </div>
+    <div class="gcard">
+      <h4>速查</h4>
+      <table class="ginfo">${g.info.map(r => `<tr><th>${r[0]}</th><td>${r[1]}</td></tr>`).join('')}</table>
+    </div>
+    ${g.route ? `<div class="gcard"><h4>怎么玩</h4>${g.route.map(t => `<div class="gstep"><em>·</em><span>${t}</span></div>`).join('')}</div>` : ''}
+    ${g.kid ? `<div class="gcard"><h4>带 3 岁娃的提示</h4>${g.kid.map(t => `<div class="gline">${t}</div>`).join('')}</div>` : ''}
+    ${g.alert ? `<div class="gcard warnt"><h4>⚠️ 当季情报 / 关键提醒</h4><p class="gfeat">${g.alert}</p></div>` : ''}
+    ${g.avoid ? `<div class="gcard"><h4>避坑</h4>${g.avoid.map(t => `<div class="gline">${t}</div>`).join('')}</div>` : ''}
+    <div class="gfoot">资料来自景区官网与 2026 年 10–11 月当季公开信息。<br>门票、开放时间与预约规则会变，出行前请再核实一次。</div>`;
+  document.getElementById('guideBody').scrollTop = 0;
+  show('pageGuide');
+}
+
+/* =====================================================================
+   清单 Tab
+   ===================================================================== */
+let seg = 'book';
+function listKeys(){
+  if (seg === 'book') return BOOKING.map((r,i) => K.bk(i));
+  if (seg === 'pack') return PACKING.flatMap((g,gi) => g.items.map((it,i) => K.pk(gi,i)));
+  if (seg === 'eat')  return MUST_EAT.map((t,i) => K.me(i));
+  return CLOTHES_CHECK.map((t,i) => K.cl(i));
+}
+function renderList(){
+  document.getElementById('listSeg').innerHTML = [['book','预约'],['pack','行李'],['eat','餐饮'],['cloth','穿衣']]
+    .map(([k,t]) => `<button role="tab" data-seg="${k}" aria-selected="${seg===k}">${t}</button>`).join('');
+  document.querySelectorAll('[data-seg]').forEach(b => { b.onclick = () => { seg = b.dataset.seg; renderList(); paintProgress(); }; });
+  const body = document.getElementById('listBody');
+  if (seg === 'book'){
+    body.innerHTML = `<div class="pbar"><i data-pbar style="background:var(--maple)"></i></div>
+      <div class="sec"><h3>预约总表</h3>
+      <p class="desc">热门景点基本都要预约，规则各不相同 —— 这是最容易翻车的环节。勾上表示「已约」。</p>
+      ${BOOKING.map((r,i) => {
+        const k = K.bk(i), on = !!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}">
+          <span class="box">${ic('check')}</span><input type="checkbox" data-k="${k}" ${on?'checked':''}>
+          <span class="tx"><b>${r[0]}</b>　<span style="color:var(--muted);font-size:12.5px">${r[1]} · ${r[2]} · ${r[3]}</span><small>${r[4]}</small></span>
+        </label>`;}).join('')}
+      </div>
+      <div class="sec"><h3>抢票要点</h3>${BOOK_TIPS.map(t=>`<div class="note">${t}</div>`).join('')}
+        <div class="note warn" style="margin-top:8px"><b>按 2026 日期重排后的窗口</b><br>
+        南博（Day2 · 11/29）应在 <b>11/22 18:00</b> 放票，<b>窗口已过</b>，先查余票或改总统府；<br>
+        中山陵（Day5 · 12/2）→ <b>11/25 16:00</b>；<br>
+        栖霞山（Day4 · 12/1）提前 1～2 天在公众号买即可。</div>
+      </div>`;
+  } else if (seg === 'pack'){
+    body.innerHTML = `<div class="pbar"><i data-pbar></i></div>` + PACKING.map((g,gi) =>
+      `<div class="sec"><h3>${g.h}</h3>${g.items.map((it,i) => {
+        const k = K.pk(gi,i), on = !!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}">
+          <span class="box">${ic('check')}</span><input type="checkbox" data-k="${k}" ${on?'checked':''}>
+          <span class="tx">${it}</span></label>`;}).join('')}</div>`).join('')
+      + `<div class="sec"><h3>票务</h3>
+        ${TRAIN_OUT.map((r,i)=>{const k=K.out(i),on=!!store[k];
+          return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+          <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">去程 ${r[0]} ${r[1]}<small>购票时勾选「携带免费儿童」申报</small></span></label>`;}).join('')}
+        ${TRAIN_BACK.map((r,i)=>{const k=K.back(i),on=!!store[k];
+          return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+          <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">返程 ${r[0]} ${r[1]}</span></label>`;}).join('')}
+        </div>`;
+  } else if (seg === 'eat'){
+    body.innerHTML = `<div class="sec"><h3>必吃清单</h3><p class="desc">勾掉吃过的</p>
+      ${MUST_EAT.map((t,i)=>{const k=K.me(i),on=!!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+        <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">${t}</span></label>`;}).join('')}
+      </div>
+      <div class="sec"><h3>选店原则</h3><p class="desc">有儿童椅 · 有不辣选项 · 上菜快 · 能停车换尿布</p>
+      <table><thead><tr><th>片区</th><th>店名 / 推荐菜</th></tr></thead><tbody>
+      ${EAT.map(r=>`<tr><td style="white-space:nowrap;color:var(--muted);font-size:12.5px">${r[0]}</td>
+        <td><b>${r[1]}</b><br><span style="font-size:12.5px;color:var(--muted)">${r[2]}　${r[3]}</span></td></tr>`).join('')}
+      </tbody></table>
+      <div class="note" style="margin-top:10px">给娃的兜底：肯德基、麦当劳、商场儿童餐随时可买。娃闹脾气别硬撑。</div></div>`;
+  } else {
+    body.innerHTML = `<div class="sec"><h3>天气</h3><p class="desc">⚠️ 出发前 2 天重新核实</p>
+      <table><thead><tr><th>日期</th><th>天气</th><th>气温</th><th>天黑</th></tr></thead><tbody>
+      ${WEATHER.map(r=>`<tr>${r.map(c=>`<td style="white-space:nowrap">${c}</td>`).join('')}</tr>`).join('')}</tbody></table>
+      <div class="note" style="margin-top:10px"><b>核心矛盾</b>：早晚 5～10℃，午后能到 20℃，单日温差超 10 度。空气偏干，润唇膏、儿童面霜必带。</div>
+      </div>
+      <div class="sec"><h3>娃的穿衣：三层法</h3>
+      ${LAYERS.map(t=>`<div class="note">${t}</div>`).join('')}
+      <div class="note" style="margin-top:8px"><b>数量</b>：长袖 ×3、薄绒 ×2、厚外套 ×1、厚袜 ×4 双、换洗裤 ×3</div>
+      </div>
+      <div class="sec"><h3>别漏</h3>
+      ${CLOTHES_CHECK.map((t,i)=>{const k=K.cl(i),on=!!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+        <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">${t}</span></label>`;}).join('')}
+      </div>`;
+  }
+  document.querySelectorAll('#listBody .ck input[data-k]').forEach(inp => {
+    inp.onchange = () => { store[inp.dataset.k] = inp.checked; saveStore();
+      inp.closest('.ck').classList.toggle('on', inp.checked); paintProgress(); };
+  });
+  paintProgress();
+}
+
+/* =====================================================================
+   更多 Tab
+   ===================================================================== */
+const MORE = [
+  {id:'rain', ic:'rain', t:'雨天方案', s:'5 天分别遇到雨怎么办'},
+  {id:'cd',   ic:'clock',t:'行前倒计时', s:'11/25 两个闹钟是硬瓶颈'},
+  {id:'trip', ic:'train',t:'交通与住宿', s:'车次 · 时间倒推 · 订房必问'},
+  {id:'planb',ic:'alert',t:'突发预案', s:'娃困了 / 生病 / 走失 / 误车'},
+  {id:'budget',ic:'wallet',t:'预算明细', s:'约 4500～5700 元'},
+  {id:'info', ic:'book', t:'实用速查', s:'地铁 · 营业时间 · 电话'},
+  {id:'share',ic:'share',t:'分享', s:'导出单天图 / 复制文字清单'},
+  {id:'about',ic:'info', t:'关于数据', s:'坐标与内容的可靠性说明'}
+];
+function renderMore(){
+  document.getElementById('moreBody').innerHTML =
+    MORE.map(m => `<button class="mrow" data-more="${m.id}">
+      <span class="mi">${ic(m.ic)}</span>
+      <span class="mt">${m.t}<small>${m.s}</small></span>
+      ${ic('chev')}
+    </button>`).join('');
+  document.querySelectorAll('[data-more]').forEach(b => { b.onclick = () => openMore(b.dataset.more, b); });
+}
+function bindDynamic(root){
+  root.querySelectorAll('.ck input[data-k]').forEach(inp => {
+    inp.onchange = () => { store[inp.dataset.k] = inp.checked; saveStore();
+      inp.closest('.ck').classList.toggle('on', inp.checked); paintProgress(); };
+  });
+  root.querySelectorAll('[data-export]').forEach(b => { b.onclick = () => exportDay(b.dataset.export); });
+  const ca = root.querySelector('[data-copyall]'); if (ca) ca.onclick = () => openText('');
+  const rs = root.querySelector('[data-reset]'); if (rs) rs.onclick = resetAll;
+}
+function openMore(id, btn){
+  const existing = document.querySelector('.more-panel');
+  const same = existing && existing.dataset.open === id;
+  if (existing) existing.remove();
+  if (same) return;
+  const box = document.createElement('div');
+  box.className = 'more-panel';
+  box.dataset.open = id;
+  box.innerHTML = MORE_DOC[id] ? MORE_DOC[id]() : '';
+  btn.after(box);
+  bindDynamic(box);
+  paintProgress();
+}
+const MORE_DOC = {
+    rain: () => `<div class="sec"><h3>雨天方案</h3>
+      <p class="desc">在行程卡里点「雨天版」可以逐天切换；这里是 5 天的速览。</p>
+      ${DAYS.map(d=>`<div class="note"><b>${d.no} ${d.date} ${d.week}</b><br>${d.rainNote}</div>`).join('')}
+      <div class="sub-h">备选景点攻略</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn sm" data-guide="zongtongfu">🏛 南京总统府</button>
+        <button class="btn sm" data-guide="kejiguan">🔬 南京科技馆</button>
+      </div>
+      <div class="note warn" style="margin-top:8px">已避开闭馆陷阱：Day3 的南博周一闭馆、Day4 的南京科技馆周二闭馆，都没有作为备选。</div>
+      </div>`,
+    cd: () => `<div class="sec"><h3>行前倒计时</h3>
+      <div class="note warn"><b>今天是 2026/11/23</b>：南博 Day2（11/29）的票应在 <b>11/22 18:00</b> 放出，窗口已过，先查余票。<br>
+      11/25 两个闹钟对应 12/2 场，与 Day5（中山陵＋15:25 返程）对得上，但与 Day2 的南博安排冲突，二选一。<br>
+      车次 G38 / G821 请用 12306 现查复核，跨年度调图后可能已变。</div>
+      ${COUNTDOWN.map((r,i)=>{const k=K.cd(i),on=!!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+        <input type="checkbox" data-k="${k}" ${on?'checked':''}>
+        <span class="tx"><b>${r[0]}</b>　${r[1]}<small>优先级：${r[2]}</small></span></label>`;}).join('')}
+      </div>`,
+    trip: () => `<div class="sec"><h3>去程（11/28 周六）</h3>
+      <table><tbody>${TRAIN_OUT.map(r=>`<tr><td style="white-space:nowrap"><b>${r[0]}</b></td>
+        <td style="white-space:nowrap">${r[1]}</td><td>${r[2]}</td><td style="white-space:nowrap">${r[3]}</td></tr>`).join('')}</tbody></table>
+      <p class="desc" style="margin-top:10px">购票时必须勾选「携带免费儿童」申报，否则到站要补票；务必选靠过道座位。</p>
+      </div>
+      <div class="sec"><h3>返程（12/2 周三）</h3>
+      <table><tbody>${TRAIN_BACK.map(r=>`<tr><td style="white-space:nowrap"><b>${r[0]}</b></td>
+        <td style="white-space:nowrap">${r[1]}</td><td>${r[2]}</td></tr>`).join('')}</tbody></table>
+      <div class="note warn" style="margin-top:10px">别买停靠<b>杭州西站</b>的车次，从西站回家比东站远得多。</div>
+      </div>
+      <div class="sec"><h3>时间倒推</h3>
+      ${TIMELINE.map(g=>`<div class="sub-h">${g.t}</div>
+        ${g.s.map(s=>`<div class="note"><b>${s[0]}</b>　${s[1]}</div>`).join('')}`).join('')}
+      <div class="note" style="margin-top:8px">带着娃＋行李＋推车，宁可早到别赶。</div>
+      </div>
+      <div class="sec"><h3>住宿：新街口—大行宫</h3>
+      ${STAY_WHY.map((t,i)=>{const k=K.stayWhy(i),on=!!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+        <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">${t}</span></label>`;}).join('')}
+      <div class="sub-h">订房必问 4 句</div>
+      ${STAY_ASK.map((t,i)=>{const k=K.stayAsk(i),on=!!store[k];
+        return `<label class="ck${on?' on':''}" data-k="${k}"><span class="box">${ic('check')}</span>
+        <input type="checkbox" data-k="${k}" ${on?'checked':''}><span class="tx">${t}</span></label>`;}).join('')}
+      <div class="note" style="margin-top:8px">预算参考：经济型约 400 元/晚（4 晚 1600）；舒适型 600～700 元/晚（4 晚 2400～2800）。</div>
+      </div>`,
+    planb: () => PLANB.map(p=>`<div class="sec"><h3>${p.h}</h3>
+      ${p.n?`<div class="note">${p.n}</div>`:''}
+      ${(p.list||[]).map(t=>`<div class="note">${t}</div>`).join('')}
+      ${p.tb?`<table><tbody>${p.tb.map(r=>`<tr><td style="white-space:nowrap"><b>${r[0]}</b></td><td>${r[1]}</td></tr>`).join('')}</tbody></table>`:''}
+      </div>`).join(''),
+    budget: () => `<div class="sec"><h3>预算明细</h3>
+      <table><tbody>${BUDGET.map(r=>`<tr><td style="white-space:nowrap"><b>${r[0]}</b></td>
+        <td style="white-space:nowrap">${r[1]}</td><td style="font-size:12.5px;color:var(--muted)">${r[2]}</td></tr>`).join('')}
+      <tr><td><b>合计</b></td><td style="white-space:nowrap"><b>4500～5700 元</b></td><td></td></tr></tbody></table>
+      <div class="note" style="margin-top:10px">省钱空间：酒店降经济型、餐饮靠商场连锁 → <b>可压到 4000 以内</b>；娃门票几乎全免，这是带 3 岁出行的最大红利。</div>
+      </div>`,
+    info: () => `<div class="sec"><h3>地铁速查</h3>
+      <table><tbody>${METRO.map(r=>`<tr><td>${r[0]}</td><td style="white-space:nowrap;color:var(--muted)">${r[1]}</td><td style="white-space:nowrap">${r[2]}</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div class="sec"><h3>营业时间</h3>
+      <table><tbody>${HOURS.map(r=>`<tr><td>${r[0]}</td><td style="font-size:12.5px">${r[1]}</td>
+        <td style="white-space:nowrap;color:${r[2]==='—'?'var(--muted)':'#B8381F'};font-weight:${r[2]==='—'?'400':'600'}">${r[2]}</td></tr>`).join('')}</tbody></table>
+      </div>
+      <div class="sec"><h3>关键电话 / 地址</h3>${PHONES.map(t=>`<div class="note">${t}</div>`).join('')}</div>
+      <div class="sec"><h3>三条最重要的提醒</h3>${TOP3.map((t,i)=>`<div class="note warn"><b>${i+1}.</b> ${t}</div>`).join('')}</div>
+      <div class="sec"><h3>片区判断</h3>
+      <p class="desc">只有栖霞山算出城（约 20 km），其余全在市区地铁网内，30 分钟内到。</p>
+      <table><tbody>
+      <tr><td>老城·主城</td><td style="font-size:12.5px">鸡鸣寺、玄武湖、夫子庙、老门东</td><td style="white-space:nowrap">0–3 km</td></tr>
+      <tr><td>城东·钟山</td><td style="font-size:12.5px">明孝陵、植物园、中山陵、音乐台</td><td style="white-space:nowrap">5–8 km</td></tr>
+      <tr><td>城中偏东</td><td style="font-size:12.5px">南京博物院</td><td style="white-space:nowrap">4 km</td></tr>
+      <tr><td>河西·滨江</td><td style="font-size:12.5px">绿博园</td><td style="white-space:nowrap">6 km</td></tr>
+      <tr><td><b>城东北郊</b></td><td style="font-size:12.5px">栖霞山</td><td style="white-space:nowrap">约 20 km</td></tr>
+      </tbody></table>
+      <div class="note warn" style="margin-top:10px">栖霞山<b>千万别开车去</b>，红叶季周末栖霞大道 6 点就可能堵；返程地铁最稳。</div>
+      </div>`,
+    share: () => `<div class="sec"><h3>分享</h3>
+      <p class="desc">单天图是 1080 宽的竖版海报，不带勾选框，适合发群里；文字清单带勾选状态，适合自己复盘。</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        ${DAYS.map(d=>`<button class="btn sm" data-export="${d.id}">${ic('dl')}${d.no} 图</button>`).join('')}
+      </div>
+      <div style="margin-top:10px"><button class="btn" style="width:100%" data-copyall>${ic('copy')}复制全部文字清单</button></div>
+      </div>`,
+    about: () => `<div class="sec"><h3>关于数据</h3>
+      <p class="desc">内容的可靠性分级，出发前请按最紧急的那几条重新核实。</p>
+      <div class="note warn"><b>需要你自己现查</b><br>
+      · 车次 G38 / G821 的时刻 —— 跨年度调图后可能已变，用 12306 查<br>
+      · 天气 —— 页面里是长期预报趋势<br>
+      · 预约放票规则 —— 以官方小程序公告为准</div>
+      <div class="note"><b>坐标说明</b><br>
+      地图点位是按景区 / 车站公开位置的<b>近似值</b>（已做 WGS-84 → GCJ-02 纠偏以贴合高德底图），
+      用于判断片区与动线，<b>不要当导航终点坐标</b>。</div>
+      <div class="note"><b>内容修正记录</b><br>
+      · 星期按 2026 年历重排（原文误用 2025 年历）<br>
+      · Day3 的闭馆提示移到 11/30（周一），并补上「中山植物园周一闭园」的冲突<br>
+      · Day4 雨天备选里的南京科技馆周二闭馆，已换成德基 / 新街口室内<br>
+      · 南京科技馆开放日更正为「周三至周日」</div>
+      <div class="note">勾选状态存在本机浏览器，<b>换设备不同步</b>。</div>
+      <div style="margin-top:10px"><button class="btn" style="width:100%" data-reset>${ic('reset')}重置全部勾选</button></div>
+      </div>`
+};
+function resetAll(){
+  if (!confirm('确认清空全部勾选？不可撤销。')) return;
+  store = {}; saveStore();
+  document.querySelectorAll('input[data-k]').forEach(i => i.checked = false);
+  const mp = document.querySelector('.more-panel'); if (mp) mp.remove();
+  renderDeck(); renderList(); renderMore();
+  paintProgress(); toast('已重置');
+}
+
+/* =====================================================================
+   Tab 切换 / 抽屉
+   ===================================================================== */
+const scrollMem = {};
+function setTab(name){
+  document.querySelectorAll('[data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+  ['trip','map','list','more'].forEach(n => {
+    const p = document.getElementById('p-' + n);
+    if (n === name){ if (p.classList.contains('on')) return; p.classList.add('on'); }
+    else if (p.classList.contains('on')) { scrollMem[n] = p.scrollTop; p.classList.remove('on'); }
+  });
+  const p = document.getElementById('p-' + name);
+  if (name !== 'trip' && scrollMem[name] != null) requestAnimationFrame(() => { p.scrollTop = scrollMem[name]; });
+  if (name === 'map') drawMap();
+  if (name === 'list') renderList();
+  if (name === 'more') renderMore();
+}
+document.querySelectorAll('[data-tab]').forEach(b => { b.onclick = () => setTab(b.dataset.tab); });
+function show(id){ const s = document.getElementById(id); s.hidden = false; }
+function hide(id){ const s = document.getElementById(id); s.hidden = true; }
+document.querySelectorAll('[data-close]').forEach(b => {
+  b.onclick = () => { hide('sheetText'); };
+});
+document.querySelectorAll('.sheet').forEach(s => {
+  s.addEventListener('click', e => { if (e.target === s) hide(s.id); });
+});
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  if (document.querySelector('.page:not([hidden])')) { closePages(); return; }
+  hide('sheetText');
+});
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('on');
+  clearTimeout(toast._t); toast._t = setTimeout(() => t.classList.remove('on'), 1800);
+}
+
+/* =====================================================================
+   分享：文字清单
+   ===================================================================== */
+const strip = s => String(s).replace(/<[^>]+>/g, '');
+const ck = (label, k) => `- [${store[k] ? 'x' : ' '}] ${label}`;
+function buildText(onlyDay){
+  const out = [];
+  out.push('# 南京亲子五日游 · 计划清单');
+  out.push('> 两大一小（3 周岁）· 2026-11-28 → 12-02 · 高铁往返');
+  out.push('> 去程 G38 杭州东 07:47 → 南京南 08:56　返程 G821 南京南 15:25 → 杭州东 17:08');
+  out.push('');
+  const p = progress();
+  out.push(`完成进度：${p.done} / ${p.total}`);
+  out.push('');
+  (onlyDay ? [DAYS.find(d => d.id === onlyDay)] : DAYS).forEach(d => {
+    out.push(`## ${d.no} · ${d.date} ${d.week} · ${d.weather} ${d.temp} · ${d.theme}`);
+    out.push(`交通：${d.traffic}`);
+    const rain = !!store[K.rain(d.id)];
+    if (rain) out.push(`> ☔ 雨天版：${d.rainNote}`);
+    d.rows.forEach((r,i) => {
+      const segs = [r[0], r[1]];
+      if (r[2] && r[2] !== '—') segs.push(`交通：${strip(r[2])}`);
+      if (r[3] && r[3] !== '—') segs.push(strip(r[3]));
+      out.push(ck(segs.join('｜'), K.row(d.id,i)));
+      if (rain && r[4]) out.push(`      ↳ 雨天：${r[4]}`);
+    });
+    out.push(`- 可砍项：${d.cut}`);
+    out.push('');
+  });
+  if (!onlyDay){
+    out.push('## 行前倒计时');
+    COUNTDOWN.forEach((r,i) => out.push(ck(`${r[0]}｜${r[1]}`, K.cd(i))));
+    out.push('');
+    out.push('## 交通与住宿');
+    TRAIN_OUT.forEach((r,i) => out.push(ck(`去程 ${r[0]} ${r[1]}｜${r[2]}｜${r[3]}`, K.out(i))));
+    TRAIN_BACK.forEach((r,i) => out.push(ck(`返程 ${r[0]} ${r[1]}｜${r[2]}`, K.back(i))));
+    TIMELINE.forEach(g => out.push(`- ${g.t}：${g.s.map(s => s[0]+' '+s[1]).join(' → ')}`));
+    STAY_WHY.forEach((t,i) => out.push(ck(strip(t), K.stayWhy(i))));
+    STAY_ASK.forEach((t,i) => out.push(ck(strip(t), K.stayAsk(i))));
+    out.push('');
+    out.push('## 预约总表');
+    BOOKING.forEach((r,i) => out.push(ck(`${r[0]}｜${r[1]}｜${r[2]}｜${r[3]}｜${strip(r[4])}`, K.bk(i))));
+    out.push('');
+    PACKING.forEach((g,gi) => {
+      out.push(`## ${g.h}`);
+      g.items.forEach((it,i) => out.push(ck(strip(it), K.pk(gi,i))));
+      out.push('');
+    });
+    out.push('## 餐饮');
+    EAT.forEach(r => out.push(`- ${r[0]}｜${r[1]}｜${r[2]}`));
+    MUST_EAT.forEach((t,i) => out.push(ck(t, K.me(i))));
+    out.push('');
+    out.push('## 天气与穿衣');
+    out.push('| 日期 | 天气 | 气温 | 天黑 |');
+    out.push('|---|---|---|---|');
+    WEATHER.forEach(r => out.push(`| ${r.join(' | ')} |`));
+    LAYERS.forEach(t => out.push(`- ${strip(t)}`));
+    CLOTHES_CHECK.forEach((t,i) => out.push(ck(t, K.cl(i))));
+    out.push('');
+    out.push('## 突发预案');
+    PLANB.forEach(p => {
+      out.push(`### ${p.h}`);
+      if (p.n) out.push(`> ${strip(p.n)}`);
+      (p.list||[]).forEach(t => out.push(`- ${strip(t)}`));
+      (p.tb||[]).forEach(r => out.push(`- ${r[0]}：${strip(r[1])}`));
+    });
+    out.push('');
+    out.push('## 预算');
+    BUDGET.forEach(r => out.push(`- ${r[0]}：${r[1]}（${strip(r[2])}）`));
+    out.push('- 合计：约 4500～5700 元');
+    out.push('');
+    out.push('## 实用速查');
+    METRO.forEach(r => out.push(`- 地铁：${r[0]} → ${r[1]} ${r[2]}`));
+    HOURS.forEach(r => out.push(`- ${r[0]}：${r[1]}｜闭馆 ${r[2]}`));
+    PHONES.forEach(t => out.push(`- ${strip(t)}`));
+    TOP3.forEach((t,i) => out.push(`${i+1}. ${strip(t)}`));
+    out.push('');
+  }
+  out.push('---');
+  out.push('*由手机版计划清单导出，勾选状态随当前进度*');
+  return out.join('\n');
+}
+function openText(dayId){
+  document.getElementById('sheetTextTitle').textContent = dayId ? '这天的清单' : '全部文字清单';
+  const txt = buildText(dayId);
+  document.getElementById('shareText').value = txt;
+  show('sheetText');
+}
+document.getElementById('btnCopyText').onclick = async () => {
+  const ta = document.getElementById('shareText');
+  try { await navigator.clipboard.writeText(ta.value); toast('已复制到剪贴板'); }
+  catch (e) {
+    ta.removeAttribute('readonly'); ta.focus(); ta.select();
+    try { document.execCommand('copy'); toast('已复制'); } catch (e2) { toast('请长按全选复制'); }
+    ta.setAttribute('readonly','');
+  }
+};
+
+/* =====================================================================
+   分享：单天竖版海报（1080 宽，无勾选框）
+   ===================================================================== */
+function buildExport(dayId){
+  const d = DAYS.find(x => x.id === dayId);
+  const rain = !!store[K.rain(d.id)];
+  return `<div class="x-head">
+      <div class="x-day">${d.no}</div>
+      <div class="x-title">${d.date} ${d.week} · ${d.weather} ${d.temp}</div>
+      <div class="x-theme">${d.theme}　|　${d.lead}<br>${d.traffic}</div>
+    </div>
+    <div class="x-body">
+      <table><thead><tr><th style="width:126px">时间</th><th>安排</th><th style="width:196px">交通</th><th style="width:286px">提示</th></tr></thead>
+      <tbody>${d.rows.map(r => `<tr>
+        <td class="x-time">${r[0]}</td>
+        <td><b>${r[1]}</b>${rain && r[4] ? `<br><span style="font-size:24px;color:#2F5C72">☔ ${r[4]}</span>` : ''}</td>
+        <td class="x-tr">${r[2] === '—' ? '' : r[2]}</td>
+        <td class="x-tip">${r[3] === '—' ? '' : r[3]}</td>
+      </tr>`).join('')}</tbody></table>
+      <div class="x-map">${schematic(dayRoutes(d), 960, 430, 26)}</div>
+      ${(d.notes||[]).map(n => n.list.map(t => `<div class="x-note">${t}</div>`).join('')).join('')}
+      <div class="x-note"><b>可砍项</b>：${d.cut}</div>
+      ${rain ? `<div class="x-rain"><b>☔ 雨天版</b>：${d.rainNote}</div>` : ''}
+      <div class="x-foot">南京亲子五日游 · 2026.11.28–12.02 · 两大一小</div>
+    </div>`;
+}
+async function exportDay(dayId){
+  if (!window.html2canvas){ toast('截图库未加载'); return; }
+  const d = DAYS.find(x => x.id === dayId);
+  toast('正在生成图片…');
+  const root = document.getElementById('exportRoot');
+  root.innerHTML = buildExport(dayId);
+  try {
+    const h = root.scrollHeight;
+    const canvas = await html2canvas(root, { scale:1, backgroundColor:'#FFFDF9', logging:false, width:1080, height:h });
+    const a = document.createElement('a');
+    a.download = `南京${d.no.replace(' ','')}-${d.date.replace('/','-')}-行程.png`;
+    a.href = canvas.toDataURL('image/png');
+    a.click();
+    toast('图片已生成，去相册 / 下载里查看');
+  } catch (e) {
+    console.error(e); toast('生成失败：' + e.message);
+  } finally { root.innerHTML = ''; }
+}
+
+/* =====================================================================
+   GCJ-02 纠偏（高德底图用 GCJ-02，点位是 WGS-84）
+   ===================================================================== */
+function outOfChina(lat, lng){ return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271; }
+function wgs2gcj(lat, lng){
+  if (outOfChina(lat, lng)) return [lat, lng];
+  const a = 6378245.0, ee = 0.00669342162296594323;
+  const dLat = (x, y) => {
+    let r = -100 + 2*x + 3*y + .2*y*y + .1*x*y + .2*Math.sqrt(Math.abs(x));
+    r += (20*Math.sin(6*x*Math.PI) + 20*Math.sin(2*x*Math.PI)) * 2/3;
+    r += (20*Math.sin(y*Math.PI) + 40*Math.sin(y/3*Math.PI)) * 2/3;
+    r += (160*Math.sin(y/12*Math.PI) + 320*Math.sin(y*Math.PI/30)) * 2/3;
+    return r;
+  };
+  const dLng = (x, y) => {
+    let r = 300 + x + 2*y + .1*x*x + .1*x*y + .1*Math.sqrt(Math.abs(x));
+    r += (20*Math.sin(6*x*Math.PI) + 20*Math.sin(2*x*Math.PI)) * 2/3;
+    r += (20*Math.sin(x*Math.PI) + 40*Math.sin(x/3*Math.PI)) * 2/3;
+    r += (150*Math.sin(x/12*Math.PI) + 300*Math.sin(x/30*Math.PI)) * 2/3;
+    return r;
+  };
+  const radLat = lat/180*Math.PI;
+  let magic = Math.sin(radLat); magic = 1 - ee*magic*magic;
+  const sq = Math.sqrt(magic);
+  return [lat + (dLat(lng-105, lat-35)*180)/((a*(1-ee))/(magic*sq)*Math.PI),
+          lng + (dLng(lng-105, lat-35)*180)/(a/sq*Math.cos(radLat)*Math.PI)];
+}
+
+/* =====================================================================
+   启动
+   ===================================================================== */
+loadStore();
+active = todayIndex();
+pos = active;
+renderStatus();
+renderDeck();
+renderList();
+renderMore();
+renderMapChips();
+paintProgress();
+document.getElementById('sbBtn').onclick = () => { setTab('more'); setTimeout(() => openMore('cd'), 60); };
+document.getElementById('btnPrev').onclick = () => goTo(active-1, true);
+document.getElementById('btnNext').onclick = () => goTo(active+1, true);
+document.getElementById('dots').onclick = e => {
+  const b = e.target.closest('[data-dot]'); if (!b) return;
+  goTo(+b.dataset.dot, true);
+};
+document.getElementById('mapChips').onclick = e => {
+  const b = e.target.closest('[data-md]'); if (!b) return;
+  mapDay = b.dataset.md === '__today' ? DAYS[todayIndex()].id : b.dataset.md;
+  renderMapChips(); drawMap();
+};
+window.addEventListener('resize', () => layout(false));
+
+/* 依赖缺失时回退国内 CDN */
+(function ensure(){
+  const need = [];
+  if (!window.L) need.push('https://cdn.bootcdn.net/ajax/libs/leaflet/1.9.4/leaflet.js');
+  if (!window.html2canvas) need.push('https://cdn.bootcdn.net/ajax/libs/html2canvas/1.4.1/html2canvas.min.js');
+  need.forEach(src => { const s = document.createElement('script'); s.src = src; document.head.appendChild(s); });
+})();
+</script>
+</body>
+</html>
